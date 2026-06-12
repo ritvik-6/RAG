@@ -62,6 +62,7 @@ CREATE TABLE IF NOT EXISTS chat_messages (
 Create a file named `.env` in the root folder (`rag-agent-app`) and add your Groq key:
 ```ini
 GROQ_API_KEY=your_secret_groq_api_key_here
+DATABASE_URL=postgresql://postgres:Admin@localhost:5432/postgres
 ```
 
 ### 2. Start the App and Database
@@ -74,6 +75,13 @@ docker compose up --build -d
 * **Backend Check:** Go to **http://127.0.0** to view the live API docs.
 * **Run Website:** Double-click `frontend/index.html` to open the chat interface.
 
+### 4. Verification and Monitoring
+To inspect live data entries as users interact with the front-end interface, run the following command within the pgAdmin Query Terminal:
+```sql
+SELECT session_id, sender, message_text, created_at 
+FROM public.chat_messages
+ORDER BY created_at ASC;
+```
 ---
 
 ## 🔒 How to Stop the App
