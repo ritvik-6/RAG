@@ -26,8 +26,8 @@ services:
       # Directs the backend to connect internally to the 'db' container
       - DATABASE_URL=postgresql://postgres:Admin@db:5432/postgres
     volumes:
-      # Persists your uploaded PDF files inside the backend module context
-      - ./backend/documents:/app/backend/documents
+      - ./backend:/app/backend
+    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
     depends_on:
       - db
 

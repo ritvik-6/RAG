@@ -4,4 +4,3 @@ __pycache__/
 .venv/
 backend/documents/*
 !backend/documents/.gitkeep
-backend/documents/

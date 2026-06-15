@@ -12,7 +12,6 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_core.vectorstores import InMemoryVectorStore
 from langchain_core.tools import tool
-from langchain_groq import ChatGroq
 from langchain.agents import create_agent
 
 load_dotenv()
@@ -35,7 +34,7 @@ async def rebuild_vector_stores():
     """On startup, re-index any PDFs saved to disk so memory survives restarts."""
     for filename in os.listdir(UPLOAD_DIR):
         if filename.endswith(".pdf"):
-            user_id = filename.split("_")[0]
+            user_id = filename.split("_", 1)[0]
             file_path = os.path.join(UPLOAD_DIR, filename)
             try:
                 loader = PyPDFLoader(file_path)
@@ -43,9 +42,9 @@ async def rebuild_vector_stores():
                 splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
                 splits = splitter.split_documents(docs)
                 USER_VECTOR_STORES[user_id] = InMemoryVectorStore.from_documents(splits, EMBEDDINGS)
-                print(f"✅ Re-indexed PDF for user: {user_id}")
+                print(f" Re-indexed PDF for user: {user_id}")
             except Exception as e:
-                print(f"❌ Failed to re-index {filename}: {e}")
+                print(f" Failed to re-index {filename}: {e}")
 
 
 @asynccontextmanager
@@ -53,15 +52,15 @@ async def lifespan(app: FastAPI):
     global db_pool
     try:
         db_pool = await asyncpg.create_pool(DATABASE_URL, min_size=2, max_size=15)
-        print("✅ PostgreSQL connection pool established.")
+        print(" PostgreSQL connection pool established.")
         await rebuild_vector_stores()
     except Exception as e:
-        print(f"❌ Startup failure: {str(e)}")
+        print(f" Startup failure: {str(e)}")
         raise e
     yield
     if db_pool:
         await db_pool.close()
-        print("🔒 PostgreSQL connection pool closed.")
+        print(" PostgreSQL connection pool closed.")
 
 
 app = FastAPI(lifespan=lifespan)
@@ -91,7 +90,29 @@ async def upload_pdf(
     try:
         loader = PyPDFLoader(file_path)
         docs = loader.load()
-        splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+
+        extracted_text = "".join(
+            doc.page_content.strip()
+            for doc in docs
+        )
+
+        if not extracted_text:
+            raise HTTPException(
+                status_code=400,
+                detail="No extractable text found in PDF."
+            )
+
+        if len(extracted_text) < 50:
+            raise HTTPException(
+                status_code=400,
+                detail="PDF contains insufficient text."
+            )
+
+        splitter = RecursiveCharacterTextSplitter(
+            chunk_size=1000,
+            chunk_overlap=200
+        )
+
         splits = splitter.split_documents(docs)
         USER_VECTOR_STORES[user_id] = InMemoryVectorStore.from_documents(splits, EMBEDDINGS)
         return {"status": "success", "message": f"Indexed: {file.filename}"}
@@ -163,21 +184,30 @@ async def chat(
             def retrieve_context(query: str):
                 """Retrieves relevant context from the uploaded PDF document."""
                 store = USER_VECTOR_STORES[user_id]
-                docs = store.similarity_search(query, k=3)
+                results = store.similarity_search_with_score(query, k=3)
+                if not results:
+                    return "NO_RELEVANT_CONTEXT", []
+
+                docs = []
+
+                for doc, score in results:
+                    docs.append(doc)
+
                 serialized = "\n\n".join(
                     f"Content: {d.page_content}\nSource: {d.metadata.get('source', 'unknown')}"
                     for d in docs
                 )
+
                 return serialized, docs
 
-            client_prompt = (
-                "You are a document assistant. You ONLY answer questions using the context "
-                "retrieved from the uploaded PDF document via your tool. "
-                "If the retrieved context does not contain the answer, respond with: "
-                "'I could not find relevant information about this in the uploaded document.' "
-                "Do NOT use your own knowledge or training data under any circumstance. "
-                "Treat retrieved context as the only source of truth."
-            )
+            client_prompt = """You are a document assistant.
+            You must answer ONLY using information retrieved from the uploaded PDF.
+            If the tool returns NO_RELEVANT_CONTEXT,respond exactly:
+            I could not find relevant information about this in the uploaded document.
+            Do not use your own knowledge.
+            Do not guess.
+            Treat retrieved content as the only source of truth.
+            """
 
             agent = create_agent(MODEL, [retrieve_context], system_prompt=client_prompt)
             response = agent.invoke({"messages": formatted_history})
