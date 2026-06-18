@@ -1,4 +1,5 @@
-const HOST = "http://127.0.0.1:8000";
+const HOST = "http://localhost:8000";
+const WS_HOST = "ws://localhost:8000";
 const viewport = document.getElementById("messages-viewport");
 const queryInput = document.getElementById("queryConsole");
 const submitBtn = document.getElementById("submitBtn");
@@ -6,13 +7,12 @@ const statusDisplay = document.getElementById("runtimeStatus");
 const sessionsListContainer = document.getElementById("sessionsList");
 
 function generateUUID() {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
         var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
         return v.toString(16);
     });
 }
 
-// Persist user ID across refreshes
 if (!localStorage.getItem("RAG_USER_ID")) {
     localStorage.setItem("RAG_USER_ID", "user_" + Math.random().toString(36).substr(2, 9));
 }
@@ -21,7 +21,87 @@ const CURRENT_USER_ID = localStorage.getItem("RAG_USER_ID");
 let activeSessionId = null;
 let chatSessionsMemory = {};
 
-// On page load, restore sessions and history from the backend
+// Single persistent WebSocket for the lifetime of the page
+let chatSocket = null;
+let isStreaming = false;
+
+function connectWebSocket() {
+    chatSocket = new WebSocket(`${WS_HOST}/ws/chat`);
+
+    chatSocket.onopen = () => {
+        console.log("WebSocket connected.");
+    };
+
+    chatSocket.onmessage = (event) => {
+        const msg = JSON.parse(event.data);
+
+        if (msg.type === "start") {
+            // Replace "Thinking..." bubble with an empty one ready for streaming
+
+        } else if (msg.type === "token") {
+            const node = document.getElementById("streaming-bubble");
+            if (node) {
+                // Clear loader on very first token only
+                if (!node.dataset.raw) node.innerHTML = "";
+                node.dataset.raw = (node.dataset.raw || "") + msg.data;
+                node.innerHTML = node.dataset.raw
+                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                    .replace(/\n/g, '<br>');
+                viewport.scrollTop = viewport.scrollHeight;
+            }
+
+        } else if (msg.type === "end") {
+            const node = document.getElementById("streaming-bubble");
+            if (node) {
+                const finalText = node.dataset.raw || "";
+                // Persist completed message into session memory
+                chatSessionsMemory[activeSessionId].push({
+                    text: finalText,
+                    classType: "ai-align"
+                });
+                // Clean up streaming marker attributes
+                node.removeAttribute("id");
+                node.removeAttribute("data-raw");
+            }
+            isStreaming = false;
+            submitBtn.disabled = false;
+            queryInput.disabled = false;
+
+        } else if (msg.type === "error") {
+            const node = document.getElementById("streaming-bubble");
+            if (node) {
+                node.innerText = `Error: ${msg.data}`;
+                node.removeAttribute("id");
+            }
+            chatSessionsMemory[activeSessionId].push({
+                text: `Error: ${msg.data}`,
+                classType: "ai-align"
+            });
+            isStreaming = false;
+            submitBtn.disabled = false;
+            queryInput.disabled = false;
+        }
+    };
+
+    chatSocket.onerror = (err) => {
+        console.error("WebSocket error:", err);
+        const node = document.getElementById("streaming-bubble");
+        if (node) {
+            node.innerText = "Connection error.";
+            node.removeAttribute("id");
+        }
+        isStreaming = false;
+        submitBtn.disabled = false;
+        queryInput.disabled = false;
+    };
+
+    chatSocket.onclose = () => {
+        console.warn("WebSocket closed. Reconnecting in 2s...");
+        // Auto-reconnect after a short delay
+        setTimeout(connectWebSocket, 2000);
+    };
+}
+
 async function restoreSessionsFromBackend() {
     statusDisplay.innerText = "Restoring your session...";
     try {
@@ -39,20 +119,17 @@ async function restoreSessionsFromBackend() {
         const sessions = data.sessions;
 
         if (Object.keys(sessions).length === 0) {
-            // No history — start fresh
             activeSessionId = generateUUID();
             chatSessionsMemory[activeSessionId] = [
                 { text: "Hello! Upload a PDF to get started.", classType: "ai-align" }
             ];
         } else {
-            // Restore all sessions from DB
             Object.entries(sessions).forEach(([sid, messages]) => {
                 chatSessionsMemory[sid] = messages.map(m => ({
                     text: m.text,
                     classType: m.sender === "user" ? "user-align" : "ai-align"
                 }));
             });
-            // Set most recent session as active
             activeSessionId = Object.keys(sessions)[Object.keys(sessions).length - 1];
         }
 
@@ -61,7 +138,6 @@ async function restoreSessionsFromBackend() {
 
     } catch (err) {
         statusDisplay.innerText = "❌ Could not connect to backend.";
-        // Fallback: start a blank session
         activeSessionId = generateUUID();
         chatSessionsMemory[activeSessionId] = [
             { text: "Hello! Upload a PDF to get started.", classType: "ai-align" }
@@ -85,7 +161,7 @@ function renderSessionsSidebar() {
         deleteBtn.innerText = "✕";
         deleteBtn.className = "delete-session-btn";
         deleteBtn.onclick = (e) => {
-            e.stopPropagation(); // prevent switching session when clicking delete
+            e.stopPropagation();
             deleteSession(sessionId);
         };
 
@@ -99,15 +175,11 @@ async function deleteSession(sessionId) {
     if (!confirm("Delete this session? This cannot be undone.")) return;
 
     try {
-        const response = await fetch(`${HOST}/session/${sessionId}`, {
-            method: "DELETE"
-        });
+        const response = await fetch(`${HOST}/session/${sessionId}`, { method: "DELETE" });
 
         if (response.ok) {
-            // Remove from local memory
             delete chatSessionsMemory[sessionId];
 
-            // If deleted session was active, switch to another or create new
             if (activeSessionId === sessionId) {
                 const remaining = Object.keys(chatSessionsMemory);
                 if (remaining.length > 0) {
@@ -179,54 +251,54 @@ async function processPDF() {
 }
 
 async function handleQuerySubmission() {
+    if (isStreaming) return;
+
     const text = queryInput.value.trim();
     if (!text) return;
 
+    // Guard: block if WebSocket isn't open
+    if (!chatSocket || chatSocket.readyState !== WebSocket.OPEN) {
+        alert("Connection not ready. Please wait a moment and try again.");
+        return;
+    }
+
+    isStreaming = true;
+    submitBtn.disabled = true;
+    queryInput.disabled = true;
+
+    // Render user bubble immediately
     chatSessionsMemory[activeSessionId].push({ text, classType: "user-align" });
-    appendBubble(text, "user-align");
+    appendBubble(text, "user-align", null);
     queryInput.value = "";
 
-    const loaderToken = appendBubble("Thinking...", "ai-align");
+    // Create a placeholder streaming bubble with a fixed ID
+    const streamNode = document.createElement("div");
+    streamNode.className = "chat-bubble ai-align";
+    streamNode.id = "streaming-bubble";
+    streamNode.dataset.raw = "";
+    streamNode.innerHTML = "Thinking...";
+    viewport.appendChild(streamNode);
+    viewport.scrollTop = viewport.scrollHeight;
 
-    const packet = new FormData();
-    packet.append("message", text);
-    packet.append("user_id", CURRENT_USER_ID);
-    packet.append("session_id", activeSessionId);
-
-    try {
-        const response = await fetch(`${HOST}/chat`, { method: "POST", body: packet });
-        const data = await response.json();
-        const node = document.getElementById(loaderToken);
-
-        if (response.ok) {
-            const formatted = data.response
-                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                .replace(/\n/g, '<br>');
-            node.innerHTML = formatted;
-            chatSessionsMemory[activeSessionId].push({ text: data.response, classType: "ai-align" });
-        } else {
-            node.innerText = `Error: ${data.detail}`;
-            chatSessionsMemory[activeSessionId].push({ text: `Error: ${data.detail}`, classType: "ai-align" });
-        }
-    } catch (err) {
-        const node = document.getElementById(loaderToken);
-        node.innerText = "Connection failed.";
-        chatSessionsMemory[activeSessionId].push({ text: "Connection failed.", classType: "ai-align" });
-    }
+    // Send payload over the persistent WebSocket
+    chatSocket.send(JSON.stringify({
+        user_id: CURRENT_USER_ID,
+        session_id: activeSessionId,
+        message: text
+    }));
 }
 
-function appendBubble(messageText, sideTokenClass) {
-    const token = "bubble-" + Date.now() + Math.random().toString(36).substr(2, 4);
+function appendBubble(messageText, sideTokenClass, customId) {
     const domNode = document.createElement("div");
     domNode.className = `chat-bubble ${sideTokenClass}`;
-    domNode.id = token;
+    if (customId) domNode.id = customId;
     domNode.innerHTML = messageText
         .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
         .replace(/\n/g, '<br>');
     viewport.appendChild(domNode);
     viewport.scrollTop = viewport.scrollHeight;
-    return token;
 }
 
-// Boot: restore from backend instead of starting blank
+// Boot
+connectWebSocket();
 restoreSessionsFromBackend();

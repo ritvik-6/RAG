@@ -11,11 +11,64 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-      # Automatically initializes your tables using your existing schema script
       - ./database/schema.sql:/docker-entrypoint-initdb.d/init.sql:ro
 
+  etcd:
+    container_name: milvus-etcd
+    image: quay.io/coreos/etcd:v3.5.18
+    restart: always
+    environment:
+      - ETCD_AUTO_COMPACTION_MODE=revision
+      - ETCD_AUTO_COMPACTION_RETENTION=1000
+      - ETCD_QUOTA_BACKEND_BYTES=4294967296
+      - ETCD_SNAPSHOT_COUNT=50000
+    volumes:
+      - etcddata:/etcd
+    command: etcd -advertise-client-urls=http://etcd:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
+
+  minio:
+    container_name: milvus-minio
+    image: minio/minio:RELEASE.2023-03-20T20-16-18Z
+    restart: always
+    environment:
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+    volumes:
+      - miniodata:/minio_data
+    command: minio server /minio_data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  milvus:
+    container_name: milvus-standalone
+    image: milvusdb/milvus:v2.4.0
+    restart: always
+    command: ["milvus", "run", "standalone"]
+    ports:
+      - "19530:19530"
+      - "9091:9091"
+    environment:
+      ETCD_ENDPOINTS: etcd:2379
+      MINIO_ADDRESS: minio:9000
+    volumes:
+      - milvusdata:/var/lib/milvus
+    depends_on:
+      - etcd
+      - minio
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
   backend:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: backend_runtime
     container_name: fastapi-backend
     restart: always
     ports:
@@ -23,14 +76,33 @@ services:
     env_file:
       - .env
     environment:
-      # Directs the backend to connect internally to the 'db' container
       - DATABASE_URL=postgresql://postgres:Admin@db:5432/postgres
+      - MILVUS_URI=http://milvus:19530
     volumes:
       - ./backend:/app/backend
     command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
     depends_on:
       - db
+      - milvus
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: frontend_runtime
+    container_name: vanilla-frontend
+    restart: always
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
 
 volumes:
   pgdata:
+    driver: local
+  etcddata:
+    driver: local
+  miniodata:
+    driver: local
+  milvusdata:
     driver: local
