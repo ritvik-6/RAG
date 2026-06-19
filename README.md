@@ -80,35 +80,62 @@ All services are orchestrated via Docker Compose:
 | `backend` | FastAPI + Uvicorn — REST & WebSocket API | `8000` |
 | `frontend` | Nginx serving the HTML/JS/CSS chat UI | `3000` |
 
+> `DATABASE_URL` and `MILVUS_URI` are set directly in `docker-compose.yml`. Only `GROQ_API_KEY` needs to be in your `.env` file.
+
 ---
 
 ## 🚀 How to Run the App
 
-### 1. Configure Your Keys
-Create a file named `.env` in the root folder and add your keys:
+### 2. Configure Your Keys
+Create a file named `.env` in the root folder:
 ```ini
 GROQ_API_KEY=your_secret_groq_api_key_here
 ```
+> Get your free Groq API key at https://console.groq.com
 
-### 2. Start All Services
+### 3. Start All Services
 ```bash
 docker compose up -d --build
 ```
+> First run takes a few minutes — Docker needs to pull Milvus, PostgreSQL, and MinIO images.
 
-### 3. Open the Application
-* **Chat UI:** Go to **http://localhost:3000**
-* **API Docs:** Go to **http://localhost:8000/docs**
+### 4. Open the Application
+* **Chat UI:** http://localhost:3000
+* **API Docs:** http://localhost:8000/docs
 
-### 4. How It Works
+### 5. Start Chatting
+1. Click **Choose File** and select a PDF
+2. Click **Ingest File** and wait for the success message
+3. Type your question and hit **Send**
+
+---
+
+## ⚙️ How It Works
 1. Upload a PDF — it gets chunked, embedded, and indexed into Milvus
 2. Ask a question — sent over a WebSocket connection
 3. The backend retrieves relevant chunks from Milvus and streams the response token by token
 4. Chat history is persisted in PostgreSQL and restored on page refresh
 
-### 5. Verify Data in PostgreSQL
-To inspect live messages via pgAdmin Query Terminal:
+---
+
+## 🔍 Inspecting Data with pgAdmin
+
+### Connect to PostgreSQL
+Open pgAdmin and create a new server connection with these details:
+
+| Field | Value |
+|---|---|
+| Host | `localhost` |
+| Port | `5432` |
+| Database | `postgres` |
+| Username | `postgres` |
+| Password | `Admin` |
+
+### View Chat Data
+Open the Query Tool and run:
 ```sql
-SELECT 
+-- View all messages
+SELECT
     s.user_id,
     m.session_id,
     m.sender,
@@ -117,6 +144,11 @@ SELECT
 FROM public.chat_messages m
 JOIN public.chat_sessions s ON m.session_id = s.session_id
 ORDER BY m.created_at ASC;
+
+-- View all sessions
+SELECT session_id, user_id, created_at
+FROM public.chat_sessions
+ORDER BY created_at ASC;
 ```
 
 ---
