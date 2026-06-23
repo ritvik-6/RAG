@@ -16,3 +16,13 @@ CREATE TABLE IF NOT EXISTS chat_messages (
     message_text TEXT NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+--Create the Documents Table
+CREATE TABLE IF NOT EXISTS documents (
+    document_id UUID PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    filename TEXT NOT NULL,
+    upload_time TIMESTAMP DEFAULT NOW(),
+    page_count INTEGER,
+    metadata JSONB DEFAULT '{}'::jsonb
+);

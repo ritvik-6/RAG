@@ -12,6 +12,11 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./database/schema.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   etcd:
     container_name: milvus-etcd
@@ -82,8 +87,10 @@ services:
       - ./backend:/app/backend
     command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
     depends_on:
-      - db
-      - milvus
+      milvus:
+        condition: service_started
+      db:
+        condition: service_healthy
 
   frontend:
     build:
@@ -94,6 +101,9 @@ services:
     restart: always
     ports:
       - "3000:80"
+    # --- ADD THIS VOLUMES BLOCK FOR LIVE HOT-RELOADING ---
+    volumes:
+      - ./frontend:/usr/share/nginx/html:ro  # Maps local files directly as Read-Only
     depends_on:
       - backend
 

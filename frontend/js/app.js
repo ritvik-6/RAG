@@ -20,8 +20,6 @@ const CURRENT_USER_ID = localStorage.getItem("RAG_USER_ID");
 
 let activeSessionId = null;
 let chatSessionsMemory = {};
-
-// Single persistent WebSocket for the lifetime of the page
 let chatSocket = null;
 let isStreaming = false;
 
@@ -29,19 +27,20 @@ function connectWebSocket() {
     chatSocket = new WebSocket(`${WS_HOST}/ws/chat`);
 
     chatSocket.onopen = () => {
-        console.log("WebSocket connected.");
+        console.log("WebSocket connected smoothly.");
     };
 
     chatSocket.onmessage = (event) => {
         const msg = JSON.parse(event.data);
 
         if (msg.type === "start") {
-            // Replace "Thinking..." bubble with an empty one ready for streaming
-
+            const streamNode = document.getElementById("streaming-bubble");
+            if (streamNode) {
+                streamNode.innerHTML = "";
+            }
         } else if (msg.type === "token") {
             const node = document.getElementById("streaming-bubble");
             if (node) {
-                // Clear loader on very first token only
                 if (!node.dataset.raw) node.innerHTML = "";
                 node.dataset.raw = (node.dataset.raw || "") + msg.data;
                 node.innerHTML = node.dataset.raw
@@ -49,24 +48,20 @@ function connectWebSocket() {
                     .replace(/\n/g, '<br>');
                 viewport.scrollTop = viewport.scrollHeight;
             }
-
         } else if (msg.type === "end") {
             const node = document.getElementById("streaming-bubble");
             if (node) {
                 const finalText = node.dataset.raw || "";
-                // Persist completed message into session memory
                 chatSessionsMemory[activeSessionId].push({
                     text: finalText,
                     classType: "ai-align"
                 });
-                // Clean up streaming marker attributes
                 node.removeAttribute("id");
                 node.removeAttribute("data-raw");
             }
             isStreaming = false;
             submitBtn.disabled = false;
             queryInput.disabled = false;
-
         } else if (msg.type === "error") {
             const node = document.getElementById("streaming-bubble");
             if (node) {
@@ -84,34 +79,30 @@ function connectWebSocket() {
     };
 
     chatSocket.onerror = (err) => {
-        console.error("WebSocket error:", err);
-        const node = document.getElementById("streaming-bubble");
-        if (node) {
-            node.innerText = "Connection error.";
-            node.removeAttribute("id");
-        }
+        console.error("WebSocket network fault encountered:", err);
         isStreaming = false;
         submitBtn.disabled = false;
         queryInput.disabled = false;
     };
 
     chatSocket.onclose = () => {
-        console.warn("WebSocket closed. Reconnecting in 2s...");
-        // Auto-reconnect after a short delay
+        console.warn("WebSocket dropped or closed by server. Reconnecting in 2s...");
         setTimeout(connectWebSocket, 2000);
     };
 }
 
 async function restoreSessionsFromBackend() {
-    statusDisplay.innerText = "Restoring your session...";
+    statusDisplay.innerText = "Restoring active conversation state...";
     try {
         const res = await fetch(`${HOST}/history/${CURRENT_USER_ID}`);
+        if (!res.ok) throw new Error("Server configuration fault or history database trace crashed.");
+        
         const data = await res.json();
 
         if (data.has_pdf) {
             queryInput.disabled = false;
             submitBtn.disabled = false;
-            statusDisplay.innerText = "✅ Document ready. Your session has been restored.";
+            statusDisplay.innerText = "✅ System mapped. Your document stack is ready.";
         } else {
             statusDisplay.innerText = "Upload a PDF to get started.";
         }
@@ -137,7 +128,8 @@ async function restoreSessionsFromBackend() {
         switchActiveSession(activeSessionId);
 
     } catch (err) {
-        statusDisplay.innerText = "❌ Could not connect to backend.";
+        console.error("History restoration dropped:", err);
+        statusDisplay.innerText = "❌ Offline mode. Cannot communicate with data layer nodes.";
         activeSessionId = generateUUID();
         chatSessionsMemory[activeSessionId] = [
             { text: "Hello! Upload a PDF to get started.", classType: "ai-align" }
@@ -221,34 +213,149 @@ function switchActiveSession(sessionId) {
     viewport.scrollTop = viewport.scrollHeight;
 }
 
-async function processPDF() {
-    const picker = document.getElementById("pdfFileInput");
-    if (!picker.files[0]) return alert("Select a PDF file first.");
-
-    statusDisplay.innerText = "Indexing document...";
-    document.getElementById("uploadBtn").disabled = true;
-
-    const packet = new FormData();
-    packet.append("file", picker.files[0]);
-    packet.append("user_id", CURRENT_USER_ID);
+async function fetchAndRenderDocumentCatalog() {
+    const docContainer = document.getElementById("documentsList");
+    if (!docContainer) return;
 
     try {
-        const response = await fetch(`${HOST}/upload`, { method: "POST", body: packet });
-        const meta = await response.json();
+        const response = await fetch(`${HOST}/documents/${CURRENT_USER_ID}`);
+        if (!response.ok) throw new Error("Could not fetch active workspace documents list mapping.");
+        
+        const documents = await response.json();
+        docContainer.innerHTML = "";
 
-        if (response.ok) {
-            statusDisplay.innerText = `✅ Loaded: ${picker.files[0].name}`;
-            queryInput.disabled = false;
-            submitBtn.disabled = false;
-        } else {
-            statusDisplay.innerText = `❌ Upload failed: ${meta.detail}`;
+        if (documents.length === 0) {
+            docContainer.innerHTML = `<div style="font-size: 12px; color: #64748b; padding: 5px;">No active documents in workspace ledger.</div>`;
+            return;
         }
-    } catch (err) {
-        statusDisplay.innerText = "❌ Could not reach backend.";
-    } finally {
-        document.getElementById("uploadBtn").disabled = false;
+
+        documents.forEach((doc) => {
+            const rowItem = document.createElement("div");
+            rowItem.className = "session-item"; 
+            rowItem.style.display = "flex";
+            rowItem.style.justifyContent = "space-between";
+            rowItem.style.alignItems = "center";
+            rowItem.style.padding = "6px 8px";
+            rowItem.style.marginBottom = "4px";
+            rowItem.style.background = "#f1f5f9";
+            rowItem.style.borderRadius = "4px";
+
+            const fileLabel = document.createElement("span");
+            fileLabel.innerText = doc.filename;
+            fileLabel.style.fontSize = "13px";
+            fileLabel.style.whiteSpace = "nowrap";
+            fileLabel.style.overflow = "hidden";
+            fileLabel.style.textOverflow = "ellipsis";
+            fileLabel.style.maxWidth = "80%";
+            fileLabel.title = doc.filename; 
+
+            const dropButton = document.createElement("button");
+            dropButton.innerText = "✕";
+            dropButton.className = "delete-session-btn";
+            dropButton.style.border = "none";
+            dropButton.style.background = "none";
+            dropButton.style.color = "#ef4444";
+            dropButton.style.cursor = "pointer";
+            dropButton.onclick = async (e) => {
+                e.stopPropagation();
+                await executeDocumentPurgeSequence(doc.document_id);
+            };
+
+            rowItem.appendChild(fileLabel);
+            rowItem.appendChild(dropButton);
+            docContainer.appendChild(rowItem);
+        });
+
+    } catch (faultError) {
+        console.error("Failed to build documents UI lists maps views:", faultError);
     }
 }
+
+async function executeDocumentPurgeSequence(documentId) {
+    if (!confirm("Are you sure you want to permanently delete this document from the database, vector storage, and physical disk layers?")) return;
+
+    try {
+        const executionPass = await fetch(`${HOST}/documents/${documentId}`, { method: "DELETE" });
+        if (executionPass.ok) {
+            alert("Document asset completely purged from enterprise system boundaries.");
+            await fetchAndRenderDocumentCatalog();
+            
+            // Re-verify if any documents remain to toggle input buttons safely without resetting session history
+            const verifyRes = await fetch(`${HOST}/documents/${CURRENT_USER_ID}`);
+            const remainingDocs = await verifyRes.json();
+            if (remainingDocs.length === 0) {
+                queryInput.disabled = true;
+                submitBtn.disabled = true;
+                statusDisplay.innerText = "Upload a PDF to get started.";
+            }
+        } else {
+            alert("Administrative failure occurred while dropping database nodes.");
+        }
+    } catch (pipelineErr) {
+        alert("Network processing fault during document removal sequence.");
+    }
+}
+
+async function triggerBatchUploadSequence() {
+    const selector = document.getElementById('batch-pdf-uploader');
+    if (!selector) {
+        console.error("CRITICAL ERROR: Input element 'batch-pdf-uploader' is missing from the page.");
+        return;
+    }
+    
+    const selectedFiles = selector.files;
+    if (selectedFiles.length === 0) {
+        alert("Please highlight or select at least one PDF file first.");
+        return;
+    }
+
+    const uploadButton = document.querySelector(".upload-control-panel button");
+    if (uploadButton) uploadButton.disabled = true;
+    
+    statusDisplay.innerText = `Ingesting block of ${selectedFiles.length} files...`;
+
+    for (const activeFile of selectedFiles) {
+        const structuralForm = new FormData();
+        structuralForm.append("file", activeFile);
+        structuralForm.append("user_id", CURRENT_USER_ID); 
+
+        try {
+            console.log(`Pushing asset payload: ${activeFile.name}`);
+            const apiResponse = await fetch(`${HOST}/upload`, {
+                method: "POST",
+                body: structuralForm
+            });
+
+            if (!apiResponse.ok) {
+                const structuralError = await apiResponse.json();
+                console.error(`Fault data returned for ${activeFile.name}:`, structuralError.detail);
+                alert(`Error uploading ${activeFile.name}: ${structuralError.detail}`);
+                continue;
+            }
+
+            const feedbackData = await apiResponse.json();
+            console.log(`Server catalog successfully resolved for: ${activeFile.name}`, feedbackData);
+        } catch (networkError) {
+            console.error(`Network communication bridge failed for ${activeFile.name}:`, networkError);
+        }
+    }
+
+    alert("Batch metadata processing sequence completed successfully.");
+    selector.value = ""; 
+    if (uploadButton) uploadButton.disabled = false;
+    
+    // FIXED: Render the files list and unlock input controls directly WITHOUT resetting session views
+    await fetchAndRenderDocumentCatalog();
+    queryInput.disabled = false;
+    submitBtn.disabled = false;
+    statusDisplay.innerText = "✅ System mapped. Your document stack is ready.";
+}
+
+window.triggerBatchUploadSequence = triggerBatchUploadSequence;
+window.createNewSession = createNewSession;
+window.handleQuerySubmission = handleQuerySubmission;
+window.fetchAndRenderDocumentCatalog = fetchAndRenderDocumentCatalog;
+window.executeDocumentPurgeSequence = executeDocumentPurgeSequence;
 
 async function handleQuerySubmission() {
     if (isStreaming) return;
@@ -256,9 +363,8 @@ async function handleQuerySubmission() {
     const text = queryInput.value.trim();
     if (!text) return;
 
-    // Guard: block if WebSocket isn't open
     if (!chatSocket || chatSocket.readyState !== WebSocket.OPEN) {
-        alert("Connection not ready. Please wait a moment and try again.");
+        alert("Connection loop handshake is unready. Please allow a brief moment.");
         return;
     }
 
@@ -266,12 +372,10 @@ async function handleQuerySubmission() {
     submitBtn.disabled = true;
     queryInput.disabled = true;
 
-    // Render user bubble immediately
     chatSessionsMemory[activeSessionId].push({ text, classType: "user-align" });
     appendBubble(text, "user-align", null);
     queryInput.value = "";
 
-    // Create a placeholder streaming bubble with a fixed ID
     const streamNode = document.createElement("div");
     streamNode.className = "chat-bubble ai-align";
     streamNode.id = "streaming-bubble";
@@ -280,7 +384,6 @@ async function handleQuerySubmission() {
     viewport.appendChild(streamNode);
     viewport.scrollTop = viewport.scrollHeight;
 
-    // Send payload over the persistent WebSocket
     chatSocket.send(JSON.stringify({
         user_id: CURRENT_USER_ID,
         session_id: activeSessionId,
@@ -299,6 +402,6 @@ function appendBubble(messageText, sideTokenClass, customId) {
     viewport.scrollTop = viewport.scrollHeight;
 }
 
-// Boot
 connectWebSocket();
 restoreSessionsFromBackend();
+fetchAndRenderDocumentCatalog();

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,17 +8,24 @@
     <link rel="stylesheet" href="css/style.css">
     <script defer src="js/app.js"></script>
 </head>
+
 <body>
     <div id="sidebar">
-        <h2>📄 Document Console</h2>
+        <h2>Documents</h2>
         <p style="font-size: 12px; color: #64748b;">Upload a PDF to configure your document context.</p>
 
-        <div class="panel-card">
-            <input type="file" id="pdfFileInput" accept=".pdf">
-            <button id="uploadBtn" onclick="processPDF()" style="width: 100%;">Ingest File</button>
+        <div class="upload-control-panel">
+            <input type="file" id="batch-pdf-uploader" accept=".pdf" multiple />
+            <button onclick="triggerBatchUploadSequence()">Upload Documents</button>
         </div>
 
         <div id="runtimeStatus" class="status-txt">System standby: no active index.</div>
+
+        <div class="docs-header">
+            <h3>Documents</h3>
+        </div>
+        <div id="documentsList" class="docs-container"
+            style="max-height: 150px; overflow-y: auto; margin-bottom: 15px;"></div>
 
         <hr class="divider">
 
@@ -34,15 +42,11 @@
             <div class="chat-bubble ai-align">Hello! Upload a PDF to get started.</div>
         </div>
         <div id="input-dock">
-            <input
-                type="text"
-                id="queryConsole"
-                placeholder="Ask something about your document..."
-                disabled
-                onkeydown="if(event.key === 'Enter') handleQuerySubmission()"
-            >
+            <input type="text" id="queryConsole" placeholder="Ask something about your document..." disabled
+                onkeydown="if(event.key === 'Enter') handleQuerySubmission()">
             <button id="submitBtn" onclick="handleQuerySubmission()" disabled>Send</button>
         </div>
     </div>
 </body>
+
 </html>

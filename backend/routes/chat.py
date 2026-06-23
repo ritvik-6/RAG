@@ -1,11 +1,9 @@
+# backend/routes/chat.py
 import json
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from langchain_core.tools import tool
-from langchain.agents import create_agent
-from backend.config import MODEL, EMBEDDINGS
+
 from backend.database import get_db
-from backend.vector_store import get_milvus
-from backend.prompts import DOCUMENT_ASSISTANT_PROMPT
+from backend.services.agent import get_user_agent # Import your new factory service
 
 router = APIRouter()
 
@@ -13,16 +11,21 @@ router = APIRouter()
 async def websocket_chat(websocket: WebSocket):
     await websocket.accept()
 
-    db = get_db()
-    if not db:
-        await websocket.send_text(json.dumps({"type": "error", "data": "Database pool unavailable."}))
+    pool = get_db()
+    if not pool:
+        await websocket.send_text(json.dumps({"type": "error", "data": "Database singletons unavailable."}))
         await websocket.close()
         return
 
     try:
         while True:
             raw = await websocket.receive_text()
-            payload = json.loads(raw)
+
+            try:
+                payload = json.loads(raw)
+            except json.JSONDecodeError:
+                await websocket.send_text(json.dumps({"type": "error", "data": "Inbound payload must be valid JSON."}))
+                continue
 
             user_id = payload.get("user_id")
             session_id = payload.get("session_id")
@@ -32,16 +35,9 @@ async def websocket_chat(websocket: WebSocket):
                 continue
 
             collection_name = f"user_{user_id.replace('-', '_')}"
-            client = get_milvus()
 
-            if not client.has_collection(collection_name):
-                await websocket.send_text(json.dumps({
-                    "type": "error",
-                    "data": "No document found. Please upload a PDF first."
-                }))
-                continue
-
-            async with db.acquire() as conn:
+            # Persist and fetch message history matrices via asyncpg pool handles
+            async with pool.acquire() as conn:
                 await conn.execute(
                     "INSERT INTO chat_sessions (session_id, user_id) VALUES ($1, $2) ON CONFLICT (session_id) DO NOTHING",
                     session_id, user_id
@@ -63,33 +59,16 @@ async def websocket_chat(websocket: WebSocket):
                 for r in rows
             ]
 
-            @tool(response_format="content_and_artifact")
-            def retrieve_context(query: str):
-                """Retrieves relevant context from the uploaded PDF document."""
-                query_vector = EMBEDDINGS.embed_query(query)
-                results = client.search(
-                    collection_name=collection_name,
-                    data=[query_vector],
-                    limit=3,
-                    output_fields=["text", "source"]
-                )
-                if not results or not results[0]:
-                    return "NO_RELEVANT_CONTEXT", []
+            # Fetch the modular isolated agent dynamically via the service factory
+            agent = get_user_agent(user_id=user_id, collection_name=collection_name)
 
-                hits = results[0]
-                serialized = "\n\n".join(
-                    f"Content: {hit['entity']['text']}\nSource: {hit['entity']['source']}"
-                    for hit in hits
-                )
-                return serialized, hits
-
-
-            agent = create_agent(MODEL, [retrieve_context], system_prompt=DOCUMENT_ASSISTANT_PROMPT)
+            # Initiate streaming pipelines token-by-token
             await websocket.send_text(json.dumps({"type": "start"}))
-
             full_response = ""
+
             async for event in agent.astream_events({"messages": formatted_history}, version="v2"):
-                if event.get("event") == "on_chat_model_stream":
+                kind = event.get("event")
+                if kind == "on_chat_model_stream":
                     chunk = event.get("data", {}).get("chunk")
                     if chunk and hasattr(chunk, "content") and isinstance(chunk.content, str):
                         token = chunk.content
@@ -99,16 +78,17 @@ async def websocket_chat(websocket: WebSocket):
 
             await websocket.send_text(json.dumps({"type": "end"}))
 
-            async with db.acquire() as conn:
+            async with pool.acquire() as conn:
                 await conn.execute(
                     "INSERT INTO chat_messages (session_id, sender, message_text) VALUES ($1, $2, $3)",
                     session_id, "ai", full_response
                 )
 
     except WebSocketDisconnect:
-        print("WebSocket client disconnected.")
-    except Exception as e:
+        print("WebSocket channel terminated smoothly.")
+    except Exception as runtime_fault:
+        print(f"CRITICAL FAULT DETECTED: {str(runtime_fault)}")
         try:
-            await websocket.send_text(json.dumps({"type": "error", "data": str(e)}))
+            await websocket.send_text(json.dumps({"type": "error", "data": str(runtime_fault)}))
         except Exception:
             pass

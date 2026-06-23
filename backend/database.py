@@ -1,3 +1,4 @@
+# backend/database.py
 import asyncpg
 from backend.config import DATABASE_URL
 
@@ -15,4 +16,5 @@ async def close_db():
         print(" PostgreSQL connection pool closed.")
 
 def get_db():
+    # Dynamically returning the active state prevents reference caching bugs
     return db_pool
