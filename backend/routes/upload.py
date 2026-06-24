@@ -83,9 +83,7 @@ async def upload_pdf(
             await conn.execute(
                 """
                 INSERT INTO documents (document_id, user_id, filename, page_count, metadata)
-                VALUES ($1, $2, $3, $4, $5::jsonb)
-                ON CONFLICT (user_id, filename) 
-                DO UPDATE SET upload_time = NOW(), page_count = EXCLUDED.page_count, metadata = EXCLUDED.metadata;
+                VALUES ($1, $2, $3, $4, $5::jsonb);
                 """,
                 document_uuid, user_id, file.filename, page_count, metadata_payload
             )
