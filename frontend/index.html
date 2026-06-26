@@ -6,47 +6,50 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RAG Agent</title>
     <link rel="stylesheet" href="css/style.css">
-    <script defer src="js/app.js"></script>
+    <!-- type="module" enables ES module imports in JS files -->
+    <script type="module" src="js/app.js"></script>
 </head>
 
 <body>
+    <button id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle sidebar">◀</button>
     <div id="sidebar">
-        <h2>Documents</h2>
-        <p style="font-size: 12px; color: #64748b;">Upload a PDF to configure your document context.</p>
+        <h2>RAG Agent</h2>
+        <p class="sidebar-subtitle">Upload PDFs to build your document context.</p>
 
+        <!-- Upload Panel -->
         <div class="upload-control-panel">
             <input type="file" id="batch-pdf-uploader" accept=".pdf" multiple />
             <button onclick="triggerBatchUploadSequence()">Upload Documents</button>
         </div>
 
-        <div id="runtimeStatus" class="status-txt">System standby: no active index.</div>
+        <div id="runtimeStatus" class="status-txt">System standby.</div>
 
+        <!-- Document List -->
         <div class="docs-header">
             <h3>Documents</h3>
         </div>
-        <div id="documentsList" class="docs-container"
-            style="max-height: 150px; overflow-y: auto; margin-bottom: 15px;"></div>
+        <div id="documentsList" class="docs-container"></div>
 
         <hr class="divider">
 
+        <!-- Session List -->
         <div class="sessions-header">
             <h3>💬 Chat Sessions</h3>
             <button class="new-chat-btn" onclick="createNewSession()">+ New</button>
         </div>
-
         <div id="sessionsList" class="sessions-container"></div>
     </div>
 
     <div id="chat-canvas">
-        <div id="messages-viewport">
-            <div class="chat-bubble ai-align">Hello! Upload a PDF to get started.</div>
-        </div>
+        <div id="messages-viewport"></div>
         <div id="input-dock">
-            <input type="text" id="queryConsole" placeholder="Ask something about your document..." disabled
+            <input type="text" id="queryConsole" placeholder="Ask something about your documents..." disabled
                 onkeydown="if(event.key === 'Enter') handleQuerySubmission()">
             <button id="submitBtn" onclick="handleQuerySubmission()" disabled>Send</button>
         </div>
     </div>
+
+    <!-- PDF Viewer panel is injected by pdfViewer.js at boot -->
 </body>
 
 </html>

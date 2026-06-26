@@ -8,8 +8,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from backend.config import EMBEDDINGS, UPLOAD_DIR
 from backend.database import get_db
-# Import the getter function to prevent caching None references
-from backend.vector_store import get_milvus 
+from backend.vector_store import get_milvus
 
 router = APIRouter()
 
@@ -19,13 +18,12 @@ async def upload_pdf(
     user_id: str = Form(...)
 ):
     pool = get_db()
-    client = get_milvus() # Dynamic evaluation inside request scope
-    
-    if not pool:
-        raise HTTPException(status_code=500, detail="Relational database connection pool is uninitialized.")
-    if not client:
-        raise HTTPException(status_code=500, detail="Milvus vector database engine client is uninitialized.")
+    client = get_milvus()
 
+    if not pool:
+        raise HTTPException(status_code=500, detail="Database connection pool is uninitialized.")
+    if not client:
+        raise HTTPException(status_code=500, detail="Milvus client is uninitialized.")
     if not file.filename.endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are supported.")
 
@@ -38,7 +36,7 @@ async def upload_pdf(
         docs = loader.load()
 
         if not docs or not isinstance(docs, list):
-            raise HTTPException(status_code=400, detail="Failed to parse PDF layers. File may be corrupt.")
+            raise HTTPException(status_code=400, detail="Failed to parse PDF. File may be corrupt.")
 
         page_count = len(docs)
         extracted_text = "".join(doc.page_content.strip() for doc in docs)
@@ -48,29 +46,34 @@ async def upload_pdf(
 
         splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
         splits = splitter.split_documents(docs)
+
         collection_name = f"user_{user_id.replace('-', '_')}"
 
         if not client.has_collection(collection_name):
-            # Using auto_id=True or a clean schema lets you completely drop custom counter logic
             client.create_collection(
-                collection_name=collection_name, 
+                collection_name=collection_name,
                 dimension=384,
-                id_type="string", # Configures the collection to accept string UUID keys natively
+                id_type="string",
                 max_length=64
             )
 
         vectors = EMBEDDINGS.embed_documents([s.page_content for s in splits])
 
-        # Generate separate, isolated string IDs to safeguard multi-file background operations from colliding
-        data = [
-            {
+        data = []
+        for i, split in enumerate(splits):
+            # PyPDFLoader stores the 0-based page index in metadata["page"]
+            # We store it as 1-based so citations show human-readable page numbers
+            raw_page = split.metadata.get("page", 0)
+            page_number = int(raw_page) + 1
+
+            data.append({
                 "id": str(uuid.uuid4()),
                 "vector": vectors[i],
-                "text": splits[i].page_content,
-                "source": file.filename
-            }
-            for i in range(len(splits))
-        ]
+                "text": split.page_content,
+                "source": file.filename,      # e.g. "report.pdf"
+                "page_number": page_number    # e.g. 1, 2, 3 ...
+            })
+
         client.insert(collection_name=collection_name, data=data)
 
         document_uuid = str(uuid.uuid4())

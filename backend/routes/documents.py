@@ -1,5 +1,6 @@
 import os
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import FileResponse
 from backend.database import get_db
 from backend.vector_store import get_milvus
 from backend.config import UPLOAD_DIR
@@ -72,3 +73,11 @@ async def delete_document(document_id: str):
         os.remove(file_path)
 
     return {"status": "success", "message": f"Successfully dropped document asset: {filename}"}
+
+
+@router.get("/files/{filename}")
+async def serve_document(filename: str):
+    file_path = os.path.join(UPLOAD_DIR, filename)
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="File not found.")
+    return FileResponse(file_path, media_type="application/pdf")

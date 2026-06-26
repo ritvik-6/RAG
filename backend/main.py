@@ -1,28 +1,30 @@
-# backend/main.py
 import os
-import asyncio
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI,HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from backend.database import init_db, close_db
-from backend.vector_store import init_milvus # Import the initializer helper
+from backend.vector_store import init_milvus
 from backend.routes import upload, chat, documents, history, session
+from backend.routes import admin
+
+DOCUMENTS_DIR = os.path.join(os.path.dirname(__file__), "documents")
+os.makedirs(DOCUMENTS_DIR, exist_ok=True)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     try:
         await init_db()
-        
-        # Initialize Milvus cleanly inside its module namespace
         init_milvus()
-        
         print("Application initialization completed successfully.")
     except Exception as e:
         print(f"Startup failure: {str(e)}")
         raise e
     yield
     await close_db()
+
 
 app = FastAPI(lifespan=lifespan)
 
@@ -39,3 +41,4 @@ app.include_router(chat.router)
 app.include_router(documents.router)
 app.include_router(history.router)
 app.include_router(session.router)
+app.include_router(admin.router)
