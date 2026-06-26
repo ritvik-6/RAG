@@ -64,25 +64,33 @@ docker compose up -d --build
 
 ## Project Structure
 
-```text
+```
 rag-agent-app/
 ├── backend/
-│   ├── agents/
-│   ├── routes/
-│   ├── documents/
-│   ├── database.py
-│   ├── vector_store.py
-│   └── main.py
+│   ├── agents/          # Orchestrator, RAG worker, Catalog worker
+│   ├── routes/          # upload, chat, documents, history, session, admin
+│   ├── documents/       # Uploaded PDFs (served as static files)
+│   ├── config.py        # Environment + shared models
+│   ├── database.py      # PostgreSQL connection pool
+│   ├── vector_store.py  # Milvus client
+│   ├── prompts.py       # LLM system prompts
+│   └── main.py          # FastAPI entry point
 ├── frontend/
-│   ├── css/
 │   ├── js/
+│   │   ├── app.js       # Entry point
+│   │   ├── socket.js    # WebSocket streaming
+│   │   ├── sessions.js  # Session management
+│   │   ├── documents.js # Upload & catalog
+│   │   ├── citations.js # Citation rendering
+│   │   ├── utils.js     # Markdown parser
+│   │   └── components/
+│   │       └── pdfViewer.js  # Slide-in PDF panel
+│   ├── css/style.css
 │   └── index.html
 ├── database/
-│   ├── schema.sql
-│   └── queries.sql
+│   └── schema.sql
 ├── Dockerfile
-├── docker-compose.yml
-└── .env
+└── docker-compose.yml
 ```
 
 ---
