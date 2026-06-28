@@ -24,10 +24,25 @@ ENV PYTHONUNBUFFERED=1
 EXPOSE 8000
 CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
 
+FROM node:20-alpine AS frontend_build
+
+WORKDIR /app/frontend
+
+COPY frontend/package.json ./
+RUN npm install
+
+COPY frontend/ .
+
+ARG VITE_API_HOST=http://localhost:8000
+ARG VITE_WS_HOST=ws://localhost:8000
+ENV VITE_API_HOST=$VITE_API_HOST
+ENV VITE_WS_HOST=$VITE_WS_HOST
+
+RUN npm run build
+
 FROM nginx:alpine AS frontend_runtime
 
-# Assuming your frontend folder is named 'frontend' in your root directory
-COPY ./frontend /usr/share/nginx/html
+COPY --from=frontend_build /app/frontend/dist /usr/share/nginx/html
 
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
