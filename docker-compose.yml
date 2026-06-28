@@ -98,21 +98,21 @@ services:
         condition: service_healthy
       db:
         condition: service_healthy
-
-  frontend:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: frontend_runtime
-    container_name: vanilla-frontend
-    restart: always
-    ports:
-      - "3000:80"
-    # --- ADD THIS VOLUMES BLOCK FOR LIVE HOT-RELOADING ---
-    volumes:
-      - ./frontend:/usr/share/nginx/html:ro  # Maps local files directly as Read-Only
-    depends_on:
-      - backend
+#frontend is running on port 3000 using npm run dev.For production build, you can uncomment the frontend service below and run npm run build to build the frontend and serve it using nginx.
+  # frontend:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #     target: frontend_runtime
+  #     args:
+  #       VITE_API_HOST: http://localhost:8000
+  #       VITE_WS_HOST: ws://localhost:8000
+  #   container_name: frontend
+  #   restart: always
+  #   ports:
+  #     - "3000:80"
+  #   depends_on:
+  #     - backend
 
 volumes:
   pgdata:

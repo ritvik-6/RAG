@@ -54,9 +54,16 @@ async def websocket_chat(websocket: WebSocket):
             
             await websocket.send_text(json.dumps({"type": "start"}))
             full_response = ""
-            
+            active_tool = None
+
             async for event in agent.astream_events({"messages": formatted_history}, version="v2"):
-                if event.get("event") == "on_chat_model_stream":
+                event_name = event.get("event")
+
+                if event_name == "on_tool_start":
+                    active_tool = event.get("name")
+                elif event_name == "on_tool_end":
+                    active_tool = None
+                elif event_name == "on_chat_model_stream" and active_tool is None:
                     chunk = event.get("data", {}).get("chunk")
                     if chunk and hasattr(chunk, "content") and chunk.content:
                         token = chunk.content
