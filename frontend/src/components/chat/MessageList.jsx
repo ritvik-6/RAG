@@ -32,7 +32,12 @@ export function MessageList() {
 
         return (
           <Fragment key={citationKey}>
-            <MessageBubble text={msg.text} classType={msg.classType} />
+            <MessageBubble 
+              text={msg.text} 
+              classType={msg.classType} 
+              createdAt={msg.created_at} 
+              latencyMs={msg.latency_ms} 
+            />
             {msg.classType === 'ai-align' && citations.length > 0 && (
               <CitationList
                 citations={citations}

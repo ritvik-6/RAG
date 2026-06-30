@@ -53,5 +53,12 @@ async def run_rag_sub_agent(query: str, collection_name: str) -> str:
         }
     ]
 
-    response = await MODEL.ainvoke(messages)
+    # Format and store the final prompt in the context variable container
+    from backend.config import worker_prompt_var
+    container = worker_prompt_var.get()
+    if container is not None:
+        formatted_prompt = "\n".join([f"[{msg['role'].upper()}]: {msg['content']}" for msg in messages])
+        container.value = formatted_prompt
+
+    response = MODEL.invoke(messages)
     return response.content

@@ -18,7 +18,7 @@ async def get_documents(user_id: str):
     async with pool.acquire() as conn:
         rows = await conn.fetch(
             """
-            SELECT document_id, filename, timezone('Asia/Kolkata', upload_time) AS upload_time
+            SELECT document_id, filename, upload_time
             FROM documents
             WHERE user_id = $1
             ORDER BY upload_time DESC
@@ -30,7 +30,7 @@ async def get_documents(user_id: str):
         {
             "document_id": str(r["document_id"]),
             "filename": r["filename"],
-            "upload_time": r["upload_time"].strftime("%Y-%m-%d %H:%M:%S") if r["upload_time"] else None
+            "upload_time": r["upload_time"].isoformat() if r["upload_time"] else None
         }
         for r in rows
     ]

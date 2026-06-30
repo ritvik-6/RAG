@@ -44,6 +44,14 @@ export const apiService = {
     return request(`/session/${sessionId}`, { method: 'DELETE' });
   },
 
+  async renameSession(sessionId, newName) {
+    return request(`/session/${sessionId}/rename`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_name: newName }),
+    });
+  },
+
   getFileUrl(diskFilename, page) {
     return `${HOST}/files/${encodeURIComponent(diskFilename)}#page=${page}`;
   },

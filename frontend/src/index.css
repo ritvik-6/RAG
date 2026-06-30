@@ -18,7 +18,9 @@
   --pdf-panel-transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-html, body, #root {
+html,
+body,
+#root {
   height: 100%;
   width: 100%;
   margin: 0;
@@ -35,6 +37,7 @@ body {
 #root {
   display: flex;
 }
+
 @layer base {
   * {
     box-sizing: border-box;
@@ -341,19 +344,23 @@ hr.divider {
   animation: blink 1.2s infinite;
   font-weight: bold;
 }
+
 .thinking-dots span:nth-child(2) {
   animation-delay: 0.2s;
 }
+
 .thinking-dots span:nth-child(3) {
   animation-delay: 0.4s;
 }
 
 @keyframes blink {
+
   0%,
   80%,
   100% {
     opacity: 0;
   }
+
   40% {
     opacity: 1;
   }
@@ -507,16 +514,19 @@ hr.divider {
   margin: 6px 0;
   width: 100%;
 }
+
 .md-table th,
 .md-table td {
   border: 1px solid var(--border);
   padding: 6px 10px;
   text-align: left;
 }
+
 .md-table th {
   background: #f1f5f9;
   font-weight: 600;
 }
+
 .md-table tr:hover td {
   background: #f8fafc;
 }
@@ -534,4 +544,161 @@ hr.divider {
   margin-top: 8px;
   padding: 6px 12px;
   font-size: 12px;
+}
+
+/* ── Inline Session Rename Styles ── */
+.edit-session-input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  color: inherit;
+  padding: 0;
+  margin: 0;
+}
+
+.session-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.session-actions-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.session-menu-trigger {
+  background: transparent;
+  color: #94a3b8;
+  border: none;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.15s ease, color 0.15s, background 0.15s;
+}
+
+.session-item:hover .session-menu-trigger {
+  opacity: 1;
+}
+
+.session-menu-trigger:hover {
+  background: #cbd5e1;
+  color: #0f172a;
+}
+
+.session-dropdown-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  min-width: 110px;
+}
+
+.session-dropdown-menu button {
+  background: transparent;
+  color: var(--text-dark);
+  border: none;
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.session-dropdown-menu button:hover {
+  background: #f1f5f9;
+  color: var(--text-dark);
+}
+
+.session-dropdown-menu button.delete-option:hover {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+/* ── Document Item Styles ── */
+.doc-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.doc-name {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text-dark);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.doc-time {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+/* ── Message Bubble Metadata Styles ── */
+.chat-bubble-container {
+  display: flex;
+  flex-direction: column;
+  max-width: 70%;
+}
+
+.chat-bubble-container.user-align {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+
+.chat-bubble-container.ai-align {
+  align-self: flex-start;
+  align-items: flex-start;
+}
+
+.chat-bubble-container .chat-bubble {
+  max-width: 100%;
+}
+
+.chat-bubble-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  padding: 0 4px;
+  margin-bottom: 8px;
+}
+
+.meta-separator {
+  color: #cbd5e1;
+}
+
+.bubble-latency {
+  font-weight: 500;
 }

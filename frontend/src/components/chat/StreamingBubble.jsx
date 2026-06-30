@@ -41,7 +41,7 @@ export function StreamingBubble({ sessionId }) {
           cancelAnimationFrame(rafRef.current);
           rafRef.current = null;
         }
-        finalizeAiMessage(sessionId, rawRef.current);
+        finalizeAiMessage(sessionId, rawRef.current, data);
       } else if (event === 'error') {
         if (rafRef.current !== null) {
           cancelAnimationFrame(rafRef.current);

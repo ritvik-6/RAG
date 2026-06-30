@@ -25,7 +25,12 @@ export function PdfViewerPanel() {
           ✕
         </button>
       </div>
-      <iframe id="pdf-viewer-iframe" src={isOpen ? iframeSrc : ''} title="PDF Viewer" />
+     <iframe
+  key={iframeSrc}
+  id="pdf-viewer-iframe"
+  src={isOpen ? iframeSrc : ''}
+  title="PDF Viewer"
+/>
     </div>
   );
 }

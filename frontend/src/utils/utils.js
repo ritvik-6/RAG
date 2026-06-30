@@ -1,8 +1,47 @@
 // utils.js — Shared utilities: markdown rendering + citation parsing
 // Preserved from frontend/js/utils.js
 
+export function formatTimestamp(isoString) {
+  if (!isoString) return '';
+  const date = new Date(isoString);
+  if (isNaN(date.getTime())) return isoString;
+
+  const now = new Date();
+  const isToday = date.toDateString() === now.toDateString();
+
+  const yesterday = new Date();
+  yesterday.setDate(now.getDate() - 1);
+  const isYesterday = date.toDateString() === yesterday.toDateString();
+
+  const timeFormatter = new Intl.DateTimeFormat(undefined, {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  });
+
+  const dateFormatter = new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  });
+
+  if (isToday) {
+    return `Today, ${timeFormatter.format(date)}`;
+  } else if (isYesterday) {
+    return `Yesterday, ${timeFormatter.format(date)}`;
+  } else {
+    return dateFormatter.format(date);
+  }
+}
+
 export function renderMarkdown(text) {
-  const lines = text.split('\n');
+  // Detect ISO 8601 timestamps and format them in the user's local timezone
+  const isoDateRegex = /\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})\b/g;
+  const processedText = text.replace(isoDateRegex, (match) => formatTimestamp(match));
+
+  const lines = processedText.split('\n');
   let html = '';
   let inTable = false;
 

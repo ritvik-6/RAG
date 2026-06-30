@@ -1,9 +1,19 @@
 import os
+import contextvars
 from dotenv import load_dotenv
 from langchain_groq import ChatGroq
 from langchain_huggingface import HuggingFaceEmbeddings
 
 load_dotenv()
+
+# Container class to allow async-safe prompt propagation from child tasks back to parent task
+class PromptContainer:
+    def __init__(self):
+        self.value = ""
+
+# ContextVar to capture the PromptContainer instance
+worker_prompt_var = contextvars.ContextVar("worker_prompt", default=None)
+
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:

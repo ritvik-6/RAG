@@ -25,7 +25,7 @@ class ChatService {
     } else if (msg.type === 'token') {
       this._notify('token', msg.data);
     } else if (msg.type === 'end') {
-      this._notify('end');
+      this._notify('end', msg.latency_ms);
     } else if (msg.type === 'error') {
       this._notify('error', msg.data);
     }

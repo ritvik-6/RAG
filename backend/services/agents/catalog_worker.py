@@ -5,12 +5,10 @@ from backend.config import MODEL
 async def run_catalog_sub_agent(user_id: str) -> str:
     """Isolated metadata ledger audit agent runner."""
     pool = get_db()
-    if not pool:
-        return "Database is currently unavailable."
     async with pool.acquire() as conn:
         records = await conn.fetch(
             """
-            SELECT filename, timezone('Asia/Kolkata', upload_time) AS upload_time_ist, page_count 
+            SELECT filename, upload_time, page_count 
             FROM documents 
             WHERE user_id = $1 
             ORDER BY upload_time DESC
@@ -22,7 +20,7 @@ async def run_catalog_sub_agent(user_id: str) -> str:
             return "No documents found in your active storage account database workspace catalog matrix."
 
         catalog_data = "\n".join([
-            f"- File: {r['filename']} | Pages: {r['page_count']} | Uploaded (IST): {r['upload_time_ist']}"
+            f"- File: {r['filename']} | Pages: {r['page_count']} | Uploaded: {r['upload_time'].isoformat() if r['upload_time'] else 'unknown'}"
             for r in records
         ])
 
@@ -31,5 +29,12 @@ async def run_catalog_sub_agent(user_id: str) -> str:
             {"role": "user", "content": f"Raw relational records data:\n{catalog_data}"}
         ]
         
-        response = await MODEL.ainvoke(messages)
+        # Format and store the final prompt in the context variable container
+        from backend.config import worker_prompt_var
+        container = worker_prompt_var.get()
+        if container is not None:
+            formatted_prompt = "\n".join([f"[{msg['role'].upper()}]: {msg['content']}" for msg in messages])
+            container.value = formatted_prompt
+
+        response = MODEL.invoke(messages)
         return response.content

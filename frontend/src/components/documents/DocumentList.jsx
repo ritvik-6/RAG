@@ -13,9 +13,12 @@ export function DocumentList({ userId }) {
 
     try {
       const remaining = await executeDocumentPurge(documentId, userId);
+      console.log("Remaining documents:", remaining);
+      console.log("Remaining count:", remaining.length);
       if (remaining.length === 0) {
+        console.log("Last document deleted");
         setInputEnabled(false);
-        setRuntimeStatus('Upload a PDF to get started.');
+        setRuntimeStatus("Upload a PDF to get started.");
       }
     } catch (err) {
       alert(err.message === 'Failed to delete document.' ? 'Failed to delete document.' : 'Connection error during document deletion.');
@@ -32,6 +35,7 @@ export function DocumentList({ userId }) {
         <DocumentItem
           key={doc.document_id}
           filename={doc.filename}
+          uploadTime={doc.upload_time}
           onDelete={(e) => {
             e?.stopPropagation?.();
             handleDelete(doc.document_id);
