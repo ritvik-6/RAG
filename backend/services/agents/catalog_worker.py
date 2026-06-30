@@ -5,6 +5,8 @@ from backend.config import MODEL
 async def run_catalog_sub_agent(user_id: str) -> str:
     """Isolated metadata ledger audit agent runner."""
     pool = get_db()
+    if not pool:
+        return "Database is currently unavailable."
     async with pool.acquire() as conn:
         records = await conn.fetch(
             """
@@ -29,5 +31,5 @@ async def run_catalog_sub_agent(user_id: str) -> str:
             {"role": "user", "content": f"Raw relational records data:\n{catalog_data}"}
         ]
         
-        response = MODEL.invoke(messages)
+        response = await MODEL.ainvoke(messages)
         return response.content

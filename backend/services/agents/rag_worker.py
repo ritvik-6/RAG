@@ -1,28 +1,32 @@
+import asyncio
 from backend.config import EMBEDDINGS, MODEL
 from backend.vector_store import get_milvus
 from backend.prompts import get_rag_agent_prompt
 
 
-def run_rag_sub_agent(query: str, collection_name: str) -> str:
+async def run_rag_sub_agent(query: str, collection_name: str) -> str:
     """Isolated RAG specialist: retrieves chunks with page numbers and returns cited answer."""
     client = get_milvus()
-    if not client or not client.has_collection(collection_name):
+    if not client:
         return "I could not find relevant information about this in the uploaded document."
 
-    query_vector = EMBEDDINGS.embed_query(query)
+    has_col = await asyncio.to_thread(client.has_collection, collection_name)
+    if not has_col:
+        return "I could not find relevant information about this in the uploaded document."
 
-    results = client.search(
+    query_vector = await asyncio.to_thread(EMBEDDINGS.embed_query, query)
+
+    results = await asyncio.to_thread(
+        client.search,
         collection_name=collection_name,
         data=[query_vector],
         limit=5,
-        output_fields=["text", "source", "page_number"]  # page_number now fetched
+        output_fields=["text", "source", "page_number"]
     )
 
     if not results or not results[0]:
         return "I could not find relevant information about this in the uploaded document."
 
-    # Build context string with filename and page so the RAG agent
-    # can emit [[cite:filename:page]] markers accurately
     context_parts = []
     for hit in results[0]:
         entity = hit["entity"]
@@ -49,5 +53,5 @@ def run_rag_sub_agent(query: str, collection_name: str) -> str:
         }
     ]
 
-    response = MODEL.invoke(messages)
+    response = await MODEL.ainvoke(messages)
     return response.content

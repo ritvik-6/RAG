@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { chatService } from '../../services/chatService';
 import { renderMarkdown } from '../../utils/utils';
 import { useSessionStore } from '../../stores/sessionStore';
+import DOMPurify from 'dompurify';
 
 /**
  * Streaming bubble — tokens accumulate in useRef, rendered via requestAnimationFrame.
@@ -21,7 +22,10 @@ export function StreamingBubble({ sessionId }) {
     rafRef.current = requestAnimationFrame(() => {
       rafRef.current = null;
       const preview = rawRef.current.replace(/\[\[cite:[^\]]+\]\]/g, '');
-      setPreviewHtml(renderMarkdown(preview));
+      setPreviewHtml(DOMPurify.sanitize(renderMarkdown(preview), {
+        ALLOWED_TAGS: ['strong', 'em', 'code', 'pre', 'br', 'table', 'tbody', 'tr', 'td', 'th', 'sup'],
+        ALLOWED_ATTR: ['class', 'data-index'],
+      }));
     });
   };
 

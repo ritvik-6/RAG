@@ -1,5 +1,6 @@
 import os
 import shutil
+import asyncio
 import uuid
 import json
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
@@ -28,12 +29,12 @@ async def upload_pdf(
         raise HTTPException(status_code=400, detail="Only PDF files are supported.")
 
     file_path = os.path.join(UPLOAD_DIR, f"{user_id}_{file.filename}")
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    contents = await file.read()
+    await asyncio.to_thread(lambda: open(file_path, "wb").write(contents))
 
     try:
         loader = PyPDFLoader(file_path)
-        docs = loader.load()
+        docs = await asyncio.to_thread(loader.load)
 
         if not docs or not isinstance(docs, list):
             raise HTTPException(status_code=400, detail="Failed to parse PDF. File may be corrupt.")
@@ -45,19 +46,20 @@ async def upload_pdf(
             raise HTTPException(status_code=400, detail="PDF contains insufficient text content.")
 
         splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-        splits = splitter.split_documents(docs)
+        splits = await asyncio.to_thread(splitter.split_documents, docs)
 
         collection_name = f"user_{user_id.replace('-', '_')}"
 
-        if not client.has_collection(collection_name):
-            client.create_collection(
+        if not await asyncio.to_thread(client.has_collection, collection_name):
+            await asyncio.to_thread(
+                client.create_collection,
                 collection_name=collection_name,
                 dimension=384,
                 id_type="string",
                 max_length=64
             )
 
-        vectors = EMBEDDINGS.embed_documents([s.page_content for s in splits])
+        vectors = await asyncio.to_thread(EMBEDDINGS.embed_documents,[s.page_content for s in splits])
 
         data = []
         for i, split in enumerate(splits):
@@ -74,7 +76,7 @@ async def upload_pdf(
                 "page_number": page_number    # e.g. 1, 2, 3 ...
             })
 
-        client.insert(collection_name=collection_name, data=data)
+        await asyncio.to_thread(client.insert, collection_name=collection_name, data=data)
 
         document_uuid = str(uuid.uuid4())
         metadata_payload = json.dumps({

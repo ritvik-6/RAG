@@ -72,3 +72,15 @@ export function generateUUID() {
     return v.toString(16);
   });
 }
+
+export function stripCitationMarkers(rawText) {
+  const seen = new Map();
+  let counter = 0;
+  return rawText.replace(/\[\[cite:([^:\]]+):(\d+)\]\]/g, (_match, filename, page) => {
+    const key = `${filename}:${page}`;
+    if (!seen.has(key)) {
+      seen.set(key, ++counter);
+    }
+    return `[${seen.get(key)}]`;
+  });
+}

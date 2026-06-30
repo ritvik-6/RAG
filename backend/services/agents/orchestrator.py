@@ -14,11 +14,7 @@ def create_orchestrator_agent(user_id: str, collection_name: str):
     async def rag_sub_agent(query: str) -> str:
         """Call this agent strictly to search, extract, and read text insights
         from within the user's uploaded physical document scopes."""
-        import asyncio
-        result = run_rag_sub_agent(query, collection_name)
-        if asyncio.iscoroutine(result):
-            return await result
-        return result
+        return await run_rag_sub_agent(query, collection_name)
 
     @tool
     async def catalog_sub_agent(query: str) -> str:

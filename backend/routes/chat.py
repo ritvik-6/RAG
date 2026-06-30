@@ -35,13 +35,13 @@ async def websocket_chat(websocket: WebSocket):
                     "INSERT INTO chat_sessions (session_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
                     session_id, user_id
                 )
+                rows = await conn.fetch(
+                "SELECT sender, message_text FROM chat_messages WHERE session_id = $1 ORDER BY created_at ASC",
+                session_id
+                )
                 await conn.execute(
                     "INSERT INTO chat_messages (session_id, sender, message_text) VALUES ($1, $2, $3)",
                     session_id, "user", message
-                )
-                rows = await conn.fetch(
-                    "SELECT sender, message_text FROM chat_messages WHERE session_id = $1 ORDER BY created_at ASC",
-                    session_id
                 )
 
             formatted_history = [
@@ -56,14 +56,15 @@ async def websocket_chat(websocket: WebSocket):
             full_response = ""
             active_tool = None
 
-            async for event in agent.astream_events({"messages": formatted_history}, version="v2"):
+            input_messages = formatted_history + [{"role": "user", "content": message}]
+            async for event in agent.astream_events({"messages": input_messages}, version="v2"):
                 event_name = event.get("event")
 
                 if event_name == "on_tool_start":
                     active_tool = event.get("name")
                 elif event_name == "on_tool_end":
                     active_tool = None
-                elif event_name == "on_chat_model_stream" and active_tool is None:
+                elif event_name == "on_chat_model_stream" and active_tool is not None:
                     chunk = event.get("data", {}).get("chunk")
                     if chunk and hasattr(chunk, "content") and chunk.content:
                         token = chunk.content

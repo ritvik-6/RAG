@@ -1,4 +1,5 @@
 import os
+import asyncio
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 from backend.database import get_db
@@ -57,9 +58,10 @@ async def delete_document(document_id: str):
         collection_name = f"user_{user_id.replace('-', '_')}"
 
         # 2. Delete vectors matching this specific file out of Milvus using text expressions
-        if client.has_collection(collection_name):
-            # Using an expression to filter out rows containing the exact filename match
-            client.delete(
+        has_col = await asyncio.to_thread(client.has_collection, collection_name)
+        if has_col:
+            await asyncio.to_thread(
+                client.delete,
                 collection_name=collection_name,
                 filter=f'source == "{filename}"'
             )
