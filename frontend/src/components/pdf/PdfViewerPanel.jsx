@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { usePdfStore } from '../../stores/pdfStore';
+import { X } from 'lucide-react';
 
 export function PdfViewerPanel() {
   const isOpen = usePdfStore((s) => s.isOpen);
@@ -21,16 +22,22 @@ export function PdfViewerPanel() {
     <div id="pdf-viewer-panel" className={isOpen ? 'open' : ''}>
       <div id="pdf-viewer-header">
         <span id="pdf-viewer-title">{title}</span>
-        <button id="pdf-viewer-close" type="button" title="Close viewer" onClick={close}>
-          ✕
+        <button
+          id="pdf-viewer-close"
+          type="button"
+          title="Close viewer"
+          onClick={close}
+          className="flex items-center justify-center"
+        >
+          <X size={18} />
         </button>
       </div>
-     <iframe
-  key={iframeSrc}
-  id="pdf-viewer-iframe"
-  src={isOpen ? iframeSrc : ''}
-  title="PDF Viewer"
-/>
+      <iframe
+        key={iframeSrc}
+        id="pdf-viewer-iframe"
+        src={isOpen ? iframeSrc : ''}
+        title="PDF Viewer"
+      />
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { useSessionStore } from '../../stores/sessionStore';
 import { useUiStore } from '../../stores/uiStore';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { getUserId } from '../../lib/userId';
+import { SendHorizontal } from 'lucide-react';
 
 export function QueryInput() {
   const [text, setText] = useState('');
@@ -55,8 +56,15 @@ export function QueryInput() {
           if (e.key === 'Enter') handleQuerySubmission();
         }}
       />
-      <button id="submitBtn" type="button" disabled={disabled} onClick={handleQuerySubmission}>
-        Send
+      <button
+        id="submitBtn"
+        type="button"
+        disabled={disabled}
+        onClick={handleQuerySubmission}
+        className="flex items-center justify-center"
+        title="Send query"
+      >
+        <SendHorizontal size={18} />
       </button>
     </div>
   );

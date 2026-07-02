@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { useDocumentStore } from '../../stores/documentStore';
 import { useUiStore } from '../../stores/uiStore';
+import { UploadCloud, Loader2 } from 'lucide-react';
 
 export function UploadPanel({ userId }) {
   const fileInputRef = useRef(null);
@@ -37,7 +38,17 @@ export function UploadPanel({ userId }) {
   return (
     <div className="upload-control-panel">
       <input ref={fileInputRef} type="file" id="batch-pdf-uploader" accept=".pdf" multiple />
-      <button type="button" disabled={uploading} onClick={triggerBatchUploadSequence}>
+      <button
+        type="button"
+        disabled={uploading}
+        onClick={triggerBatchUploadSequence}
+        className="flex items-center justify-center gap-2"
+      >
+        {uploading ? (
+          <Loader2 size={18} className="animate-spin shrink-0" />
+        ) : (
+          <UploadCloud size={18} className="shrink-0" />
+        )}
         Upload Documents
       </button>
     </div>

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { Pencil, Trash2, MoreHorizontal } from 'lucide-react';
 
 export function SessionItem({ sessionName, isActive, onSelect, onDelete, onRename }) {
   const [isEditing, setIsEditing] = useState(false);
@@ -84,14 +85,14 @@ export function SessionItem({ sessionName, isActive, onSelect, onDelete, onRenam
           <div className="session-actions-wrapper" ref={menuRef}>
             <button
               type="button"
-              className="session-menu-trigger"
+              className="session-menu-trigger flex items-center justify-center"
               onClick={(e) => {
                 e.stopPropagation();
                 setIsMenuOpen(!isMenuOpen);
               }}
               title="Session actions"
             >
-              ⋮
+              <MoreHorizontal size={18} />
             </button>
             {isMenuOpen && (
               <div className="session-dropdown-menu">
@@ -103,7 +104,7 @@ export function SessionItem({ sessionName, isActive, onSelect, onDelete, onRenam
                     setIsMenuOpen(false);
                   }}
                 >
-                  ✏️ Rename
+                  <Pencil size={18} /> Rename
                 </button>
                 <button
                   type="button"
@@ -114,7 +115,7 @@ export function SessionItem({ sessionName, isActive, onSelect, onDelete, onRenam
                     setIsMenuOpen(false);
                   }}
                 >
-                  🗑️ Delete
+                  <Trash2 size={18} /> Delete
                 </button>
               </div>
             )}

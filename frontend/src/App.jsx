@@ -4,7 +4,6 @@ import { useSessionStore } from './stores/sessionStore';
 import { useDocumentStore } from './stores/documentStore';
 import { useUiStore } from './stores/uiStore';
 import { Sidebar } from './components/layout/Sidebar';
-import { SidebarToggle } from './components/layout/SidebarToggle';
 import { ChatCanvas } from './components/layout/ChatCanvas';
 import { PdfViewerPanel } from './components/pdf/PdfViewerPanel';
 import { ErrorBoundary } from './components/error/ErrorBoundary';
@@ -40,8 +39,6 @@ function App() {
   }, [userId, restoreSessionsFromBackend, fetchAndRenderDocumentCatalog, setRuntimeStatus, setInputEnabled]);
 
   return (
-  <>
-    <SidebarToggle />
     <div className="flex h-screen overflow-hidden w-full">
       <Sidebar userId={userId} />
       <ChatCanvas />
@@ -49,8 +46,7 @@ function App() {
         <PdfViewerPanel />
       </ErrorBoundary>
     </div>
-  </>
-);
+  );
 }
 
 export default App;

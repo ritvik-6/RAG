@@ -1,3 +1,5 @@
+import { FileText } from 'lucide-react';
+
 export function CitationItem({ index, filename, page, isActive, onClick }) {
   return (
     <button
@@ -12,7 +14,9 @@ export function CitationItem({ index, filename, page, isActive, onClick }) {
         <span className="citation-filename">{filename}</span>
         <span className="citation-page">· p.{page}</span>
       </span>
-      <span className="citation-icon">📄</span>
+      <span className="citation-icon flex items-center justify-center">
+        <FileText size={18} />
+      </span>
     </button>
   );
 }
