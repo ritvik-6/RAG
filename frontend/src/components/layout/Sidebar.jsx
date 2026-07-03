@@ -6,6 +6,7 @@ import { useSessionStore } from '../../stores/sessionStore';
 import { useUiStore } from '../../stores/uiStore';
 import { MessageSquare, Plus, CircleCheck, CircleAlert } from 'lucide-react';
 import { SidebarToggle } from './SidebarToggle';
+import logo from '../../assets/logo-black.png';
 
 export function Sidebar({ userId }) {
   const sidebarCollapsed = useUiStore((s) => s.sidebarCollapsed);
@@ -15,7 +16,7 @@ export function Sidebar({ userId }) {
   return (
     <aside id="sidebar" className={sidebarCollapsed ? 'collapsed' : ''}>
       <div className="sidebar-header">
-        <img src="src/assets/logo-black.png" alt="DataFactZ logo" />
+        <img src={logo} alt="DataFactZ logo" />
         <SidebarToggle />
       </div>
       <h2>RAG Agent</h2>

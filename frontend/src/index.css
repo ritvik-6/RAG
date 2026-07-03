@@ -121,6 +121,11 @@ body {
   width: 100%;
 }
 
+.sidebar-header img {
+  height: 45px;
+  width: auto;
+}
+
 #sidebar-toggle {
   width: 32px;
   height: 32px;

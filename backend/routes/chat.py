@@ -99,7 +99,10 @@ async def websocket_chat(websocket: WebSocket):
             # Instantiating modern hierarchical supervisor agent
             agent = create_orchestrator_agent(user_id, collection_name)
             
-            await websocket.send_text(json.dumps({"type": "start"}))
+            await websocket.send_text(json.dumps({
+                "type": "start",
+                "thread_id": str(thread_id)
+            }))
             full_response = ""
             active_tool = None
 

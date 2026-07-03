@@ -21,7 +21,7 @@ class ChatService {
 
   _dispatch(msg) {
     if (msg.type === 'start') {
-      this._notify('start');
+      this._notify('start', msg.thread_id);
     } else if (msg.type === 'token') {
       this._notify('token', msg.data);
     } else if (msg.type === 'end') {

@@ -27,9 +27,9 @@ export const useSessionStore = create((set, get) => ({
         ...state.chatSessionsMemory,
         [sessionId]: [
           ...(state.chatSessionsMemory[sessionId] || []),
-          { 
-            text: rawText, 
-            classType: 'ai-align', 
+          {
+            text: rawText,
+            classType: 'ai-align',
             latency_ms: latencyMs,
             created_at: new Date().toISOString()
           }
@@ -50,7 +50,7 @@ export const useSessionStore = create((set, get) => ({
     }));
   },
 
-  restoreSessionsFromBackend: async (userId, { onHasPdf, onNoPdf, onOffline }) => {
+  restoreSessionsFromBackend: async (userId, urlThreadId, { onHasPdf, onNoPdf, onOffline }) => {
     try {
       const data = await apiService.getHistory(userId);
 
@@ -65,23 +65,19 @@ export const useSessionStore = create((set, get) => ({
 
       if (Object.keys(sessions).length === 0) {
         const newId = generateUUID();
-        const newThreadId = generateUUID();
         set({
           activeSessionId: newId,
           chatSessionsMemory: {
             [newId]: [{ text: 'Hello! Upload a PDF to get started.', classType: 'ai-align' }],
           },
           sessionMetadata: {
-            [newId]: {
-              session_name: 'New Conversation',
-              thread_id: newThreadId,
-            }
+            [newId]: { session_name: 'New Conversation', thread_id: null }
           }
         });
       } else {
         const chatSessionsMemory = {};
         const sessionMetadata = {};
-        
+
         Object.entries(sessions).forEach(([sid, messages], index) => {
           chatSessionsMemory[sid] = messages.map((m) => ({
             text: m.text,
@@ -90,35 +86,41 @@ export const useSessionStore = create((set, get) => ({
             latency_ms: m.latency_ms,
           }));
 
-          // If session_name is NULL, fallback to default title
           sessionMetadata[sid] = {
             session_name: meta[sid]?.session_name || `Chat Session ${index + 1}`,
-            thread_id: meta[sid]?.thread_id || generateUUID(),
+            thread_id: meta[sid]?.thread_id || null,
           };
         });
-        
+
         const sessionIds = Object.keys(sessions);
+
+        // Prefer the session matching the current URL; only fall back
+        // to "most recent" if there's no URL thread or it isn't found.
+        let initialActiveId = sessionIds[sessionIds.length - 1];
+        if (urlThreadId) {
+          const matched = sessionIds.find(
+            (sid) => sessionMetadata[sid]?.thread_id === urlThreadId
+          );
+          if (matched) initialActiveId = matched;
+        }
+
         set({
           chatSessionsMemory,
           sessionMetadata,
-          activeSessionId: sessionIds[sessionIds.length - 1],
+          activeSessionId: initialActiveId,
         });
       }
     } catch (err) {
       console.error('History restoration failed:', err);
       onOffline?.();
       const newId = generateUUID();
-      const newThreadId = generateUUID();
       set({
         activeSessionId: newId,
         chatSessionsMemory: {
           [newId]: [{ text: 'Hello! Upload a PDF to get started.', classType: 'ai-align' }],
         },
         sessionMetadata: {
-          [newId]: {
-            session_name: 'New Conversation',
-            thread_id: newThreadId,
-          }
+          [newId]: { session_name: 'New Conversation', thread_id: null }
         }
       });
     }
@@ -126,7 +128,6 @@ export const useSessionStore = create((set, get) => ({
 
   createNewSession: () => {
     const newId = generateUUID();
-    const newThreadId = generateUUID();
     set((state) => ({
       activeSessionId: newId,
       chatSessionsMemory: {
@@ -137,7 +138,19 @@ export const useSessionStore = create((set, get) => ({
         ...state.sessionMetadata,
         [newId]: {
           session_name: 'New Conversation',
-          thread_id: newThreadId,
+          thread_id: null,
+        }
+      }
+    }));
+  },
+
+  updateSessionThreadId: (sessionId, threadId) => {
+    set((state) => ({
+      sessionMetadata: {
+        ...state.sessionMetadata,
+        [sessionId]: {
+          ...state.sessionMetadata[sessionId],
+          thread_id: threadId,
         }
       }
     }));
@@ -158,7 +171,7 @@ export const useSessionStore = create((set, get) => ({
       delete nextMemory[sessionId];
       const nextMetadata = { ...state.sessionMetadata };
       delete nextMetadata[sessionId];
-      return { 
+      return {
         chatSessionsMemory: nextMemory,
         sessionMetadata: nextMetadata,
       };
@@ -197,7 +210,7 @@ export const useSessionStore = create((set, get) => ({
         throw new Error('Failed to rename session on the server.');
       }
       const updated = await res.json();
-      
+
       // Update with exact values from the server response
       set((state) => ({
         sessionMetadata: {
