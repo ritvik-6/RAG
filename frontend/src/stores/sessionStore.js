@@ -50,7 +50,7 @@ export const useSessionStore = create((set, get) => ({
     }));
   },
 
-  restoreSessionsFromBackend: async (userId, urlThreadId, { onHasPdf, onNoPdf, onOffline }) => {
+    restoreSessionsFromBackend: async (userId, urlThreadId, { onHasPdf, onNoPdf, onOffline }) => {
     try {
       const data = await apiService.getHistory(userId);
 
@@ -64,15 +64,12 @@ export const useSessionStore = create((set, get) => ({
       const meta = data.session_meta || {};
 
       if (Object.keys(sessions).length === 0) {
-        const newId = generateUUID();
+        // No sessions on backend — blank landing state. Nothing created
+        // until the user actually sends a message.
         set({
-          activeSessionId: newId,
-          chatSessionsMemory: {
-            [newId]: [{ text: 'Hello! Upload a PDF to get started.', classType: 'ai-align' }],
-          },
-          sessionMetadata: {
-            [newId]: { session_name: 'New Conversation', thread_id: null }
-          }
+          activeSessionId: null,
+          chatSessionsMemory: {},
+          sessionMetadata: {},
         });
       } else {
         const chatSessionsMemory = {};
@@ -94,9 +91,9 @@ export const useSessionStore = create((set, get) => ({
 
         const sessionIds = Object.keys(sessions);
 
-        // Prefer the session matching the current URL; only fall back
-        // to "most recent" if there's no URL thread or it isn't found.
-        let initialActiveId = sessionIds[sessionIds.length - 1];
+        // Only select a session if the URL explicitly names one.
+        // Bare root ("/") always means blank landing state — no auto-resume.
+        let initialActiveId = null;
         if (urlThreadId) {
           const matched = sessionIds.find(
             (sid) => sessionMetadata[sid]?.thread_id === urlThreadId
@@ -113,35 +110,39 @@ export const useSessionStore = create((set, get) => ({
     } catch (err) {
       console.error('History restoration failed:', err);
       onOffline?.();
-      const newId = generateUUID();
       set({
-        activeSessionId: newId,
-        chatSessionsMemory: {
-          [newId]: [{ text: 'Hello! Upload a PDF to get started.', classType: 'ai-align' }],
-        },
-        sessionMetadata: {
-          [newId]: { session_name: 'New Conversation', thread_id: null }
-        }
+        activeSessionId: null,
+        chatSessionsMemory: {},
+        sessionMetadata: {},
       });
     }
   },
 
+  // "New chat" — just clears the active session. Nothing is created
+  // until a message is actually sent (see ensureActiveSession).
   createNewSession: () => {
+    set({ activeSessionId: null });
+  },
+
+  // Called at the moment the first message is sent. Creates a real
+  // session lazily so refresh never loses an empty, unsent draft.
+  ensureActiveSession: () => {
+    const { activeSessionId } = get();
+    if (activeSessionId) return activeSessionId;
+
     const newId = generateUUID();
     set((state) => ({
       activeSessionId: newId,
       chatSessionsMemory: {
         ...state.chatSessionsMemory,
-        [newId]: [{ text: 'New session started. Ask away!', classType: 'ai-align' }],
+        [newId]: [],
       },
       sessionMetadata: {
         ...state.sessionMetadata,
-        [newId]: {
-          session_name: 'New Conversation',
-          thread_id: null,
-        }
-      }
+        [newId]: { session_name: 'New Conversation', thread_id: null },
+      },
     }));
+    return newId;
   },
 
   updateSessionThreadId: (sessionId, threadId) => {

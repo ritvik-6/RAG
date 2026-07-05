@@ -58,8 +58,8 @@ function MainLayout() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, restoreSessionsFromBackend, fetchAndRenderDocumentCatalog, setRuntimeStatus, setInputEnabled]);
 
-  // 2. Map URL param threadId back to sessionId (handles back/forward nav
-  // and stale/invalid links after the initial load).
+// 2. Map URL param threadId back to sessionId, or land on a blank
+  // "new conversation" screen at root — no session exists yet.
   useEffect(() => {
     if (!historyLoaded) return;
 
@@ -75,15 +75,9 @@ function MainLayout() {
         navigate('/', { replace: true });
       }
     } else {
-      const nullSessionId = Object.keys(sessionMetadata).find(
-        (sid) => sessionMetadata[sid]?.thread_id === null
-      );
-      if (nullSessionId) {
-        if (activeSessionId !== nullSessionId) {
-          switchActiveSession(nullSessionId);
-        }
-      } else {
-        createNewSession();
+      // Root always means blank landing state — like claude.ai / chatgpt.com.
+      if (activeSessionId !== null) {
+        switchActiveSession(null);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -91,7 +85,8 @@ function MainLayout() {
 
   // 3. Central listener to sync active session changes back to browser URL
   useEffect(() => {
-    if (!historyLoaded || !activeSessionId) return;
+    if (!historyLoaded) return;
+    if (activeSessionId === null) return; // blank landing — stay at root
 
     const metadata = sessionMetadata[activeSessionId];
     if (metadata) {

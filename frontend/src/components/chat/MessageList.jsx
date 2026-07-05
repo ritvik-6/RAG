@@ -6,6 +6,7 @@ import { parseCitations } from '../../utils/utils';
 import { MessageBubble } from './MessageBubble';
 import { CitationList } from './CitationList';
 import { StreamingBubble } from './StreamingBubble';
+import { MessageSquare } from 'lucide-react';
 
 export function MessageList() {
   const activeSessionId = useSessionStore((s) => s.activeSessionId);
@@ -15,13 +16,26 @@ export function MessageList() {
   const setActiveCitationKey = useUiStore((s) => s.setActiveCitationKey);
   const togglePdf = usePdfStore((s) => s.toggle);
 
-  const messages = chatSessionsMemory[activeSessionId] || [];
-
   const handleCitationClick = (filename, page, key) => {
     const isActive = activeCitationKey === key;
     setActiveCitationKey(isActive ? null : key);
     togglePdf(filename, page);
   };
+
+  // Blank landing state 
+  if (activeSessionId === null) {
+    return (
+      <div id="messages-viewport" className="messages-viewport landing-state">
+        <div className="landing-content">
+          <MessageSquare size={40} className="landing-icon" />
+          <h2>Ask anything about your documents</h2>
+          <p>Upload a PDF and start a conversation — your chat will appear here.</p>
+        </div>
+      </div>
+    );
+  }
+
+  const messages = chatSessionsMemory[activeSessionId] || [];
 
   return (
     <div id="messages-viewport" className="messages-viewport">
@@ -32,11 +46,11 @@ export function MessageList() {
 
         return (
           <Fragment key={citationKey}>
-            <MessageBubble 
-              text={msg.text} 
-              classType={msg.classType} 
-              createdAt={msg.created_at} 
-              latencyMs={msg.latency_ms} 
+            <MessageBubble
+              text={msg.text}
+              classType={msg.classType}
+              createdAt={msg.created_at}
+              latencyMs={msg.latency_ms}
             />
             {msg.classType === 'ai-align' && citations.length > 0 && (
               <CitationList

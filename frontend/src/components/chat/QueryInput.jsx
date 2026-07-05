@@ -10,7 +10,7 @@ export function QueryInput() {
   const [text, setText] = useState('');
   const isStreaming = useSessionStore((s) => s.isStreaming);
   const setStreaming = useSessionStore((s) => s.setStreaming);
-  const getActiveSessionId = useSessionStore((s) => s.getActiveSessionId);
+  const ensureActiveSession = useSessionStore((s) => s.ensureActiveSession);
   const appendUserMessage = useSessionStore((s) => s.appendUserMessage);
   const inputEnabled = useUiStore((s) => s.inputEnabled);
   const { isReady, sendMessage } = useWebSocket();
@@ -26,7 +26,8 @@ export function QueryInput() {
       return;
     }
 
-    const sessionId = getActiveSessionId();
+    // Lazily creates a real session on first send; reuses it otherwise.
+    const sessionId = ensureActiveSession();
 
     flushSync(() => {
       setStreaming(true);

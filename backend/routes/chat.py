@@ -160,4 +160,4 @@ async def websocket_chat(websocket: WebSocket):
     except WebSocketDisconnect:
         print("WebSocket tracking session closed down smoothly.")
     except Exception as runtime_fault:
-        print(f"Orchestration Error: {str(runtime_fault)}")
+        print(f"Orchestration Error: {str(runtime_fault)}")
