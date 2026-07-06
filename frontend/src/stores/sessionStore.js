@@ -8,6 +8,20 @@ export const useSessionStore = create((set, get) => ({
   sessionMetadata: {}, // Stores { session_name, thread_id } for each session
   isStreaming: false,
 
+  streamingSessionId: null,
+  streamingText: '',
+
+  startStream: (sessionId) =>
+    set({ streamingSessionId: sessionId, streamingText: '', isStreaming: true }),
+
+  appendStreamToken: (sessionId, token) => {
+    if (sessionId !== get().streamingSessionId) return;
+    set((state) => ({ streamingText: state.streamingText + token }));
+  },
+
+  endStream: () =>
+    set({ streamingSessionId: null, streamingText: '', isStreaming: false }),
+
   getActiveSessionId: () => get().activeSessionId,
 
   setStreaming: (val) => set({ isStreaming: val }),
@@ -50,7 +64,7 @@ export const useSessionStore = create((set, get) => ({
     }));
   },
 
-    restoreSessionsFromBackend: async (userId, urlThreadId, { onHasPdf, onNoPdf, onOffline }) => {
+  restoreSessionsFromBackend: async (userId, urlThreadId, { onHasPdf, onNoPdf, onOffline }) => {
     try {
       const data = await apiService.getHistory(userId);
 

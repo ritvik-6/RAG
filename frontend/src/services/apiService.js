@@ -34,6 +34,12 @@ export const apiService = {
     return request('/upload', { method: 'POST', body: formData });
   },
 
+  async getDocumentStatus(documentId) {
+    const response = await request(`/documents/${documentId}/status`);
+    if (!response.ok) throw new Error('Could not fetch document status.');
+    return response.json();
+  },
+
   async getHistory(userId) {
     const response = await request(`/history/${userId}`);
     if (!response.ok) throw new Error('History fetch failed.');

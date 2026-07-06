@@ -20,16 +20,16 @@ class ChatService {
   }
 
   _dispatch(msg) {
-    if (msg.type === 'start') {
-      this._notify('start', msg.thread_id);
-    } else if (msg.type === 'token') {
-      this._notify('token', msg.data);
-    } else if (msg.type === 'end') {
-      this._notify('end', msg.latency_ms);
-    } else if (msg.type === 'error') {
-      this._notify('error', msg.data);
-    }
+  if (msg.type === 'start') {
+    this._notify('start', { sessionId: msg.session_id, threadId: msg.thread_id });
+  } else if (msg.type === 'token') {
+    this._notify('token', { sessionId: msg.session_id, data: msg.data });
+  } else if (msg.type === 'end') {
+    this._notify('end', { sessionId: msg.session_id, latencyMs: msg.latency_ms });
+  } else if (msg.type === 'error') {
+    this._notify('error', { sessionId: msg.session_id, data: msg.data });
   }
+}
 
   _notify(event, data) {
     this.subscribers.forEach((handler) => handler(event, data));

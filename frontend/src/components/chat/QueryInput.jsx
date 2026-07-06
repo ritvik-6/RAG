@@ -9,7 +9,7 @@ import { SendHorizontal } from 'lucide-react';
 export function QueryInput() {
   const [text, setText] = useState('');
   const isStreaming = useSessionStore((s) => s.isStreaming);
-  const setStreaming = useSessionStore((s) => s.setStreaming);
+  const startStream = useSessionStore((s) => s.startStream);
   const ensureActiveSession = useSessionStore((s) => s.ensureActiveSession);
   const appendUserMessage = useSessionStore((s) => s.appendUserMessage);
   const inputEnabled = useUiStore((s) => s.inputEnabled);
@@ -30,10 +30,10 @@ export function QueryInput() {
     const sessionId = ensureActiveSession();
 
     flushSync(() => {
-      setStreaming(true);
+      startStream(sessionId);
       appendUserMessage(sessionId, trimmed);
       setText('');
-    });
+    });;
 
     sendMessage({
       user_id: getUserId(),

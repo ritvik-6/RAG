@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 from backend.database import get_db
 from backend.vector_store import get_milvus
-from backend.config import UPLOAD_DIR
+from backend.config import UPLOAD_DIR, USE_SHARED_COLLECTION
 
 router = APIRouter()
 
@@ -45,7 +45,6 @@ async def delete_document(document_id: str):
         raise HTTPException(status_code=500, detail="Database singletons are uninitialized.")
 
     async with pool.acquire() as conn:
-        # 1. Fetch document attributes before deleting the row
         doc_record = await conn.fetchrow(
             "SELECT user_id, filename FROM documents WHERE document_id = $1",
             document_id
@@ -56,45 +55,42 @@ async def delete_document(document_id: str):
 
         user_id = doc_record["user_id"]
         filename = doc_record["filename"]
-        collection_name = f"user_{user_id.replace('-', '_')}"
 
-        # 2. Delete vectors matching this specific file out of Milvus using text expressions
-        has_col = await asyncio.to_thread(client.has_collection, collection_name)
+        if USE_SHARED_COLLECTION:
+            target_collection = "rag_shared_collection"
+            delete_filter = f'document_id == "{document_id}"'
+        else:
+            target_collection = f"user_{user_id.replace('-', '_')}"
+            delete_filter = f'source == "{filename}"'
+
+        has_col = await asyncio.to_thread(client.has_collection, target_collection)
         if has_col:
             await asyncio.to_thread(
                 client.delete,
-                collection_name=collection_name,
-                filter=f'source == "{filename}"'
+                collection_name=target_collection,
+                filter=delete_filter
             )
-            # Force the delete to commit immediately. Without this, Milvus can leave
-            # deleted vectors visible to subsequent searches for an indeterminate time,
-            # causing "deleted" documents to keep leaking into RAG answers.
-            await asyncio.to_thread(client.flush, collection_name=collection_name)
+            await asyncio.to_thread(client.flush, collection_name=target_collection)
 
-            # Consistency check: confirm the delete actually took effect.
-            # Logs loudly instead of failing silently if vectors survive.
             remaining = await asyncio.to_thread(
                 client.query,
-                collection_name=collection_name,
-                filter=f'source == "{filename}"',
+                collection_name=target_collection,
+                filter=delete_filter,
                 output_fields=["id"]
             )
             if remaining:
                 print(
-                    f"WARNING: {len(remaining)} vectors for '{filename}' "
-                    f"survived delete+flush in {collection_name}"
+                    f"WARNING: {len(remaining)} vectors for document_id={document_id} "
+                    f"survived delete+flush in {target_collection}"
                 )
 
-        # 3. Drop relational ledger record out of PostgreSQL
         await conn.execute("DELETE FROM documents WHERE document_id = $1", document_id)
 
-    # 4. Safely purge physical file layout binary components off disk storage layers
     file_path = os.path.join(UPLOAD_DIR, f"{user_id}_{filename}")
     if os.path.exists(file_path):
         os.remove(file_path)
 
     return {"status": "success", "message": f"Successfully dropped document asset: {filename}"}
-
 
 @router.get("/files/{filename}")
 async def serve_document(filename: str):

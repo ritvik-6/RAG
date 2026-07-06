@@ -48,6 +48,20 @@ async def init_db():
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_thread_messages_session_id ON thread_messages(session_id);")
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_thread_messages_user_id ON thread_messages(user_id);")
             await conn.execute("CREATE INDEX IF NOT EXISTS idx_thread_messages_message_id ON thread_messages(message_id);")
+
+            # Run index and status column migration
+            import os
+            migration_path = os.path.join(
+                os.path.dirname(os.path.dirname(__file__)),
+                "database",
+                "migrations",
+                "01_add_indexes_and_status.sql"
+            )
+            if os.path.exists(migration_path):
+                with open(migration_path, "r", encoding="utf-8") as f:
+                    migration_sql = f.read()
+                await conn.execute(migration_sql)
+                print(" Applied 01_add_indexes_and_status.sql indexes & status migration.")
     print(" PostgreSQL database migrations applied successfully.")
 
 

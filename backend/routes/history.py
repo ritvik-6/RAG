@@ -33,7 +33,7 @@ async def get_user_sessions(user_id: str):
         # even after all vectors for a user were deleted (collection existed,
         # just empty).
         doc_count = await conn.fetchval(
-            "SELECT COUNT(*) FROM documents WHERE user_id = $1",
+            "SELECT COUNT(*) FROM documents WHERE user_id = $1 AND status = 'complete'",
             user_id
         )
 

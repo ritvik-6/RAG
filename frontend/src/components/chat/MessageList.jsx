@@ -15,6 +15,8 @@ export function MessageList() {
   const activeCitationKey = useUiStore((s) => s.activeCitationKey);
   const setActiveCitationKey = useUiStore((s) => s.setActiveCitationKey);
   const togglePdf = usePdfStore((s) => s.toggle);
+  const streamingSessionId = useSessionStore((s) => s.streamingSessionId);
+  const streamingText = useSessionStore((s) => s.streamingText);
 
   const handleCitationClick = (filename, page, key) => {
     const isActive = activeCitationKey === key;
@@ -62,7 +64,7 @@ export function MessageList() {
           </Fragment>
         );
       })}
-      {isStreaming && <StreamingBubble sessionId={activeSessionId} />}
+      {streamingSessionId === activeSessionId && <StreamingBubble text={streamingText} />}
     </div>
   );
 }

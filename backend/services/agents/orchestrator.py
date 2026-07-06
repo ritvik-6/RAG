@@ -10,13 +10,13 @@ from backend.services.agents.catalog_worker import run_catalog_sub_agent
 def create_orchestrator_agent(user_id: str, collection_name: str):
     """Compiles the parent supervisor engine with decoupled sub-agent tools."""
 
-    @tool
+    @tool(return_direct=True)
     async def rag_sub_agent(query: str) -> str:
         """Call this agent strictly to search, extract, and read text insights
         from within the user's uploaded physical document scopes."""
-        return await run_rag_sub_agent(query, collection_name)
+        return await run_rag_sub_agent(query, collection_name, user_id)
 
-    @tool
+    @tool(return_direct=True)
     async def catalog_sub_agent(query: str) -> str:
         """Call this agent immediately if the user is checking document status,
         upload dates, counts, names, or file inventory items."""

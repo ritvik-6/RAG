@@ -10,14 +10,14 @@ async def run_catalog_sub_agent(user_id: str) -> str:
             """
             SELECT filename, upload_time, page_count 
             FROM documents 
-            WHERE user_id = $1 
+            WHERE user_id = $1 AND status = 'complete'
             ORDER BY upload_time DESC
             """,
             user_id
         )
         
         if not records:
-            return "No documents found in your active storage account database workspace catalog matrix."
+            return "You haven't uploaded any documents yet."
 
         catalog_data = "\n".join([
             f"- File: {r['filename']} | Pages: {r['page_count']} | Uploaded: {r['upload_time'].isoformat() if r['upload_time'] else 'unknown'}"

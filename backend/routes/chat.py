@@ -2,6 +2,7 @@ import json
 import time
 import uuid
 import re
+import asyncio
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from backend.database import get_db
 from backend.services.agents.orchestrator import create_orchestrator_agent
@@ -101,7 +102,8 @@ async def websocket_chat(websocket: WebSocket):
             
             await websocket.send_text(json.dumps({
                 "type": "start",
-                "thread_id": str(thread_id)
+                "thread_id": str(thread_id),
+                "session_id": session_id
             }))
             full_response = ""
             active_tool = None
@@ -114,12 +116,17 @@ async def websocket_chat(websocket: WebSocket):
                     active_tool = event.get("name")
                 elif event_name == "on_tool_end":
                     active_tool = None
-                elif event_name == "on_chat_model_stream" and active_tool is not None:
-                    chunk = event.get("data", {}).get("chunk")
-                    if chunk and hasattr(chunk, "content") and chunk.content:
-                        token = chunk.content
-                        full_response += token
-                        await websocket.send_text(json.dumps({"type": "token", "data": token}))
+                    output = event.get("data", {}).get("output")
+                    # Tool output may be a ToolMessage object or a plain string
+                    tool_text = getattr(output, "content", output)
+                    if isinstance(tool_text, str) and tool_text:
+                        full_response = tool_text
+                        # Simulate streaming by sending word-sized chunks
+                        words = tool_text.split(" ")
+                        for i, word in enumerate(words):
+                            piece = word if i == 0 else " " + word
+                            await websocket.send_text(json.dumps({"type": "token", "data": piece,"session_id": session_id}))
+                            await asyncio.sleep(0.02)
                             
             # Stop timing immediately after the final token message is sent
             end_time = time.perf_counter()
@@ -127,7 +134,8 @@ async def websocket_chat(websocket: WebSocket):
             
             await websocket.send_text(json.dumps({
                 "type": "end",
-                "latency_ms": latency_ms
+                "latency_ms": latency_ms,
+                "session_id": session_id
             }))
             
             prompt_str = container.value

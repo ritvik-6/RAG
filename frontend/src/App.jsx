@@ -11,6 +11,7 @@ import { PdfViewerPanel } from './components/pdf/PdfViewerPanel';
 import { ErrorBoundary } from './components/error/ErrorBoundary';
 import { useWebSocket } from './hooks/useWebSocket';
 import { chatService } from './services/chatService';
+import { ChatStreamListener } from './components/chat/ChatStreamListener';
 
 function MainLayout() {
   useWebSocket();
@@ -58,7 +59,7 @@ function MainLayout() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, restoreSessionsFromBackend, fetchAndRenderDocumentCatalog, setRuntimeStatus, setInputEnabled]);
 
-// 2. Map URL param threadId back to sessionId, or land on a blank
+  // 2. Map URL param threadId back to sessionId, or land on a blank
   // "new conversation" screen at root — no session exists yet.
   useEffect(() => {
     if (!historyLoaded) return;
@@ -104,19 +105,17 @@ function MainLayout() {
 
   // 4. Listen to WebSocket start events to capture newly generated thread_ids
   useEffect(() => {
-    const unsubscribe = chatService.subscribe((event, data) => {
-      if (event === 'start' && data) {
-        const activeId = getActiveSessionId();
-        if (activeId) {
-          updateSessionThreadId(activeId, data);
-        }
+    const unsubscribe = chatService.subscribe((event, payload) => {
+      if (event === 'start' && payload) {
+        updateSessionThreadId(payload.sessionId, payload.threadId);
       }
     });
     return unsubscribe;
-  }, [updateSessionThreadId, getActiveSessionId]);
+  }, [updateSessionThreadId]);
 
   return (
     <div className="flex h-screen overflow-hidden w-full">
+      <ChatStreamListener />
       <Sidebar userId={userId} />
       <ChatCanvas />
       <ErrorBoundary name="PDF Viewer">

@@ -25,3 +25,4 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 MODEL = ChatGroq(model="qwen/qwen3-32b", reasoning_format="parsed")
 EMBEDDINGS = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+USE_SHARED_COLLECTION = os.getenv("USE_SHARED_COLLECTION", "true").lower() == "true"
