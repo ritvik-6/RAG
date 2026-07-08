@@ -34,8 +34,8 @@ services:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
     volumes:
-      - miniodata:/minio_data
-    command: minio server /minio_data
+      - miniodata:/data
+    command: minio server /data
 
   milvus:
     container_name: milvus-standalone

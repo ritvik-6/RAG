@@ -45,6 +45,7 @@ async def delete_document(document_id: str):
         raise HTTPException(status_code=500, detail="Database singletons are uninitialized.")
 
     async with pool.acquire() as conn:
+        # 1. Fetch document attributes before deleting the row
         doc_record = await conn.fetchrow(
             "SELECT user_id, filename FROM documents WHERE document_id = $1",
             document_id
@@ -56,6 +57,7 @@ async def delete_document(document_id: str):
         user_id = doc_record["user_id"]
         filename = doc_record["filename"]
 
+        # Determine target collection and delete filter based on configuration
         if USE_SHARED_COLLECTION:
             target_collection = "rag_shared_collection"
             delete_filter = f'document_id == "{document_id}"'
@@ -63,27 +65,40 @@ async def delete_document(document_id: str):
             target_collection = f"user_{user_id.replace('-', '_')}"
             delete_filter = f'source == "{filename}"'
 
+        # 2. Delete vectors out of Milvus using target filter expression
         has_col = await asyncio.to_thread(client.has_collection, target_collection)
         if has_col:
-            await asyncio.to_thread(
+            print(f"Deleting vectors from '{target_collection}' | Document ID: {document_id} | Filter: {delete_filter}...")
+            delete_res = await asyncio.to_thread(
                 client.delete,
                 collection_name=target_collection,
                 filter=delete_filter
             )
-            await asyncio.to_thread(client.flush, collection_name=target_collection)
+            print(f"Milvus deletion result for {document_id}: {delete_res}")
 
+            # Commit the delete immediately using flush if supported
+            if hasattr(client, "flush"):
+                await asyncio.to_thread(client.flush, collection_name=target_collection)
+
+            # Verification Check: confirm the delete actually took effect
             remaining = await asyncio.to_thread(
                 client.query,
                 collection_name=target_collection,
                 filter=delete_filter,
-                output_fields=["id"]
+                output_fields=["id"],
+                limit=10000
             )
             if remaining:
                 print(
-                    f"WARNING: {len(remaining)} vectors for document_id={document_id} "
-                    f"survived delete+flush in {target_collection}"
+                    f"WARNING: {len(remaining)} vectors survived delete+flush "
+                    f"in {target_collection} for filter: {delete_filter}"
                 )
+            else:
+                print(f"Milvus deletion verified successfully for Document ID: {document_id}")
+        else:
+            print(f"Milvus deletion skipped: collection '{target_collection}' does not exist.")
 
+        # 3. Drop relational ledger record out of PostgreSQL
         await conn.execute("DELETE FROM documents WHERE document_id = $1", document_id)
 
     file_path = os.path.join(UPLOAD_DIR, f"{user_id}_{filename}")

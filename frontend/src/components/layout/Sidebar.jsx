@@ -1,10 +1,12 @@
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ErrorBoundary } from '../error/ErrorBoundary';
 import { UploadPanel } from '../documents/UploadPanel';
 import { DocumentList } from '../documents/DocumentList';
 import { SessionList } from '../sessions/SessionList';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useUiStore } from '../../stores/uiStore';
-import { MessageSquare, Plus, CircleCheck, CircleAlert } from 'lucide-react';
+import { MessageSquare, Plus, CircleCheck, CircleAlert, ChevronDown, ChevronRight } from 'lucide-react';
 import { SidebarToggle } from './SidebarToggle';
 import logo from '../../assets/logo-black.png';
 
@@ -12,6 +14,11 @@ export function Sidebar({ userId }) {
   const sidebarCollapsed = useUiStore((s) => s.sidebarCollapsed);
   const runtimeStatus = useUiStore((s) => s.runtimeStatus);
   const createNewSession = useSessionStore((s) => s.createNewSession);
+  const navigate = useNavigate();
+
+  // Keep both sections expanded by default
+  const [docsExpanded, setDocsExpanded] = useState(true);
+  const [sessionsExpanded, setSessionsExpanded] = useState(true);
 
   return (
     <aside id="sidebar" className={sidebarCollapsed ? 'collapsed' : ''}>
@@ -42,31 +49,68 @@ export function Sidebar({ userId }) {
         )}
       </div>
 
-      <div className="docs-header">
-        <h3>Documents</h3>
-      </div>
-      <div id="documentsList" className="docs-container">
-        <ErrorBoundary name="Documents">
-          <DocumentList userId={userId} />
-        </ErrorBoundary>
-      </div>
+      <div className="sidebar-scroll-content">
+        {/* Documents Section */}
+        <div className="sidebar-section">
+          <div
+            className="flex items-center gap-1.5 cursor-pointer py-1.5 hover:bg-slate-100/50 rounded px-1.5 select-none transition-colors"
+            onClick={() => setDocsExpanded(!docsExpanded)}
+          >
+            {docsExpanded ? (
+              <ChevronDown size={14} className="text-slate-400 shrink-0" />
+            ) : (
+              <ChevronRight size={14} className="text-slate-400 shrink-0" />
+            )}
+            <h3>Documents</h3>
+          </div>
+          <div className={`sidebar-section-content ${docsExpanded ? 'expanded' : ''}`}>
+            <div id="documentsList" className="docs-container">
+              <ErrorBoundary name="Documents">
+                <DocumentList userId={userId} />
+              </ErrorBoundary>
+            </div>
+          </div>
+        </div>
 
-      <hr className="divider" />
+        <hr className="divider my-3" />
 
-      <div className="sessions-header">
-        <h3 className="flex items-center gap-1.5">
-          <MessageSquare size={18} className="shrink-0" />
-          Chat Sessions
-        </h3>
-        <button type="button" className="new-chat-btn flex items-center gap-1" onClick={createNewSession}>
-          <Plus size={18} className="shrink-0" />
-          New
-        </button>
-      </div>
-      <div id="sessionsList" className="sessions-container">
-        <ErrorBoundary name="Sessions">
-          <SessionList />
-        </ErrorBoundary>
+        {/* Chat Sessions Section */}
+        <div className="sidebar-section">
+          <div className="sessions-header select-none">
+            <div
+              className="flex items-center gap-1.5 cursor-pointer py-1.5 hover:bg-slate-100/50 rounded px-1.5 transition-colors"
+              onClick={() => setSessionsExpanded(!sessionsExpanded)}
+            >
+              {sessionsExpanded ? (
+                <ChevronDown size={14} className="text-slate-400 shrink-0" />
+              ) : (
+                <ChevronRight size={14} className="text-slate-400 shrink-0" />
+              )}
+              <h3 className="flex items-center gap-1.5">
+                <MessageSquare size={14} className="shrink-0 text-slate-400" />
+                Chat Sessions
+              </h3>
+            </div>
+            <button
+              type="button"
+              className="new-chat-btn flex items-center gap-1"
+              onClick={() => {
+                createNewSession();
+                navigate('/new');
+              }}
+            >
+              <Plus size={14} className="shrink-0" />
+              New
+            </button>
+          </div>
+          <div className={`sidebar-section-content ${sessionsExpanded ? 'expanded' : ''}`}>
+            <div id="sessionsList" className="sessions-container">
+              <ErrorBoundary name="Sessions">
+                <SessionList />
+              </ErrorBoundary>
+            </div>
+          </div>
+        </div>
       </div>
     </aside>
   );

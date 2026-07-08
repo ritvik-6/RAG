@@ -36,5 +36,5 @@ async def run_catalog_sub_agent(user_id: str) -> str:
             formatted_prompt = "\n".join([f"[{msg['role'].upper()}]: {msg['content']}" for msg in messages])
             container.value = formatted_prompt
 
-        response = MODEL.invoke(messages)
+        response =await MODEL.ainvoke(messages)
         return response.content

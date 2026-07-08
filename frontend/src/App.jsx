@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Routes, Route, useNavigate, useParams } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import { getUserId } from './lib/userId';
 import { useSessionStore } from './stores/sessionStore';
 import { useDocumentStore } from './stores/documentStore';
@@ -128,8 +129,10 @@ function MainLayout() {
 function App() {
   return (
     <Routes>
-      <Route path="/" element={<MainLayout />} />
+      <Route path="/new" element={<MainLayout />} />
       <Route path="/chat/:threadId" element={<MainLayout />} />
+      {/* optional */}
+      <Route path="*" element={<Navigate to="/new" replace />} />
     </Routes>
   );
 }

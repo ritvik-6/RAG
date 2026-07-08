@@ -85,5 +85,5 @@ async def run_rag_sub_agent(
         formatted_prompt = "\n".join([f"[{msg['role'].upper()}]: {msg['content']}" for msg in messages])
         container.value = formatted_prompt
 
-    response = MODEL.invoke(messages)
+    response =await MODEL.ainvoke(messages)
     return response.content

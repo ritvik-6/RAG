@@ -23,6 +23,13 @@ MILVUS_URI = os.getenv("MILVUS_URI", "http://localhost:19530")
 UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "documents")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-MODEL = ChatGroq(model="qwen/qwen3-32b", reasoning_format="parsed")
+# Generation model — used for actual answer synthesis (RAG answers, catalog tables).
+# Slight temperature is fine here; wording variation doesn't change correctness.
+MODEL = ChatGroq(model="qwen/qwen3-32b", reasoning_format="parsed", temperature=0.3)
+
+# Router model — used ONLY for tool-selection / classification decisions.
+# Temperature=0 so the same question always routes to the same tool.
+ROUTER_MODEL = ChatGroq(model="qwen/qwen3-32b", reasoning_format="parsed", temperature=0)
+
 EMBEDDINGS = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 USE_SHARED_COLLECTION = os.getenv("USE_SHARED_COLLECTION", "true").lower() == "true"

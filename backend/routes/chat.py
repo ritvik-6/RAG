@@ -6,6 +6,7 @@ import asyncio
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from backend.database import get_db
 from backend.services.agents.orchestrator import create_orchestrator_agent
+from backend.services.agents.rag_worker import run_rag_sub_agent
 from backend.config import PromptContainer, worker_prompt_var
 
 router = APIRouter()
@@ -107,6 +108,7 @@ async def websocket_chat(websocket: WebSocket):
             }))
             full_response = ""
             active_tool = None
+            tool_called = False
 
             input_messages = formatted_history + [{"role": "user", "content": message}]
             async for event in agent.astream_events({"messages": input_messages}, version="v2"):
@@ -114,6 +116,7 @@ async def websocket_chat(websocket: WebSocket):
 
                 if event_name == "on_tool_start":
                     active_tool = event.get("name")
+                    tool_called = True
                 elif event_name == "on_tool_end":
                     active_tool = None
                     output = event.get("data", {}).get("output")
@@ -127,7 +130,29 @@ async def websocket_chat(websocket: WebSocket):
                             piece = word if i == 0 else " " + word
                             await websocket.send_text(json.dumps({"type": "token", "data": piece,"session_id": session_id}))
                             await asyncio.sleep(0.02)
-                            
+
+            if not tool_called:
+                print("WARNING: Supervisor did not call any tool. Falling back to rag_sub_agent.")
+
+                full_response = await run_rag_sub_agent(
+                    query=message,
+                    collection_name=collection_name,
+                    user_id=user_id,
+                )
+
+                # Stream the fallback response
+                words = full_response.split(" ")
+                for i, word in enumerate(words):
+                    piece = word if i == 0 else " " + word
+                    await websocket.send_text(
+                        json.dumps({
+                            "type": "token",
+                            "data": piece,
+                            "session_id": session_id,
+                        })
+                    )
+                    await asyncio.sleep(0.02)
+
             # Stop timing immediately after the final token message is sent
             end_time = time.perf_counter()
             latency_ms = round((end_time - start_time) * 1000)
