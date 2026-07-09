@@ -1,13 +1,10 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { usePdfStore } from '../../stores/pdfStore';
-import { 
-  X, 
-  ChevronLeft, 
-  ChevronRight, 
-  ZoomIn, 
-  ZoomOut, 
-  Maximize2, 
-  Loader2 
+import {
+  X,
+  ChevronLeft,
+  ChevronRight,
+  Loader2
 } from 'lucide-react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { getUserId } from '../../lib/userId';
@@ -36,8 +33,13 @@ export function PdfViewerPanel() {
   // PDF.js states
   const [numPages, setNumPages] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [zoomScale, setZoomScale] = useState(1.0);
   const [loading, setLoading] = useState(true);
+
+  // Zoom & Pan states
+  const [zoomLevel, setZoomLevel] = useState(1.0);
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const panStartRef = useRef({ x: 0, y: 0 });
 
   // Container measurement
   const containerRef = useRef(null);
@@ -54,6 +56,12 @@ export function PdfViewerPanel() {
       setCurrentPage(storePage);
     }
   }, [storePage]);
+
+  // When the page index or active document changes, reset zoom and pan variables to defaults
+  useEffect(() => {
+    setZoomLevel(1.0);
+    setPanOffset({ x: 0, y: 0 });
+  }, [currentPage, fileUrl]);
 
   // When the file URL changes, reset total page count and trigger loading state
   useEffect(() => {
@@ -142,21 +150,71 @@ export function PdfViewerPanel() {
     setCurrentPage((p) => Math.min(numPages || 1, p + 1));
   };
 
-  const zoomIn = () => {
-    setZoomScale((z) => Math.min(3.0, z + 0.1));
-  };
+  // Wheel Zoom event handler centering on cursor offsets
+  const handleWheel = useCallback((e) => {
+    if (!(e.ctrlKey || e.metaKey)) return;
 
-  const zoomOut = () => {
-    setZoomScale((z) => Math.max(0.4, z - 0.1));
-  };
+    e.preventDefault();
 
-  const fitWidth = () => {
-    setZoomScale(1.0);
-  };
+    const zoomFactor = 1.1;
+    const factor = e.deltaY < 0 ? zoomFactor : 1 / zoomFactor;
 
-  // We subtract some horizontal padding to fit the canvas properly (32px padding total)
+    setZoomLevel((prev) =>
+      Math.min(4.0, Math.max(0.5, prev * factor))
+    );
+  }, []);
+
+  // Bind non-passive wheel event listener to container
+  useEffect(() => {
+    const el = containerRef.current;
+    if (el) {
+      el.addEventListener('wheel', handleWheel, { passive: false });
+    }
+    return () => {
+      if (el) {
+        el.removeEventListener('wheel', handleWheel);
+      }
+    };
+  }, [handleWheel]);
+
+  // Drag-to-pan handlers
+  const handleMouseDown = useCallback((e) => {
+    if (e.button !== 0) return;
+    if (zoomLevel <= 1) return;
+
+    setIsPanning(true);
+    panStartRef.current = {
+      x: e.clientX - panOffset.x,
+      y: e.clientY - panOffset.y,
+    };
+
+    e.preventDefault();
+  }, [zoomLevel, panOffset]);
+
+  const handleMouseMove = useCallback((e) => {
+    if (!isPanning) return;
+    const newX = e.clientX - panStartRef.current.x;
+    const newY = e.clientY - panStartRef.current.y;
+    setPanOffset({ x: newX, y: newY });
+  }, [isPanning]);
+
+  const handleMouseUp = useCallback(() => {
+    setIsPanning(false);
+  }, []);
+
+  useEffect(() => {
+    if (isPanning) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+    }
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isPanning, handleMouseMove, handleMouseUp]);
+
+  // Subtraction of bounds horizontal padding
   const baseWidth = containerWidth > 32 ? containerWidth - 32 : 280;
-  const pageCalculatedWidth = baseWidth * zoomScale;
 
   return (
     <div
@@ -190,64 +248,29 @@ export function PdfViewerPanel() {
 
       {/* Toolbar */}
       {isOpen && (
-        <div className="pdf-viewer-toolbar">
+        <div className="pdf-viewer-toolbar justify-center">
           {/* Navigation */}
           <div className="flex items-center gap-1">
             <button
               type="button"
-              className="p-1 hover:bg-slate-200 rounded disabled:opacity-30 disabled:hover:bg-transparent transition-colors text-slate-700"
+              className="p-1 hover:bg-[var(--border-muted)] rounded disabled:opacity-30 disabled:hover:bg-transparent transition-colors text-[var(--text-muted)]"
               onClick={goPrev}
               disabled={currentPage <= 1 || loading}
               title="Previous page"
             >
               <ChevronLeft size={18} />
             </button>
-            <span className="text-xs font-medium min-w-[70px] text-center text-slate-700">
+            <span className="text-xs font-medium min-w-[70px] text-center text-[var(--text-muted)]">
               Page {currentPage} / {numPages || '?'}
             </span>
             <button
               type="button"
-              className="p-1 hover:bg-slate-200 rounded disabled:opacity-30 disabled:hover:bg-transparent transition-colors text-slate-700"
+              className="p-1 hover:bg-[var(--border-muted)] rounded disabled:opacity-30 disabled:hover:bg-transparent transition-colors text-[var(--text-muted)]"
               onClick={goNext}
               disabled={currentPage >= (numPages || 1) || loading}
               title="Next page"
             >
               <ChevronRight size={18} />
-            </button>
-          </div>
-
-          {/* Zoom Actions */}
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              className="p-1 hover:bg-slate-200 rounded disabled:opacity-30 transition-colors text-slate-700"
-              onClick={zoomOut}
-              disabled={zoomScale <= 0.4 || loading}
-              title="Zoom out"
-            >
-              <ZoomOut size={18} />
-            </button>
-            <span className="text-xs font-semibold min-w-[40px] text-center text-slate-700">
-              {Math.round(zoomScale * 100)}%
-            </span>
-            <button
-              type="button"
-              className="p-1 hover:bg-slate-200 rounded disabled:opacity-30 transition-colors text-slate-700"
-              onClick={zoomIn}
-              disabled={zoomScale >= 3.0 || loading}
-              title="Zoom in"
-            >
-              <ZoomIn size={18} />
-            </button>
-            <div className="w-[1px] h-4 bg-slate-200 mx-1" />
-            <button
-              type="button"
-              className="p-1 hover:bg-slate-200 rounded text-slate-500 hover:text-slate-800 transition-colors"
-              onClick={fitWidth}
-              disabled={loading}
-              title="Fit to width"
-            >
-              <Maximize2 size={16} />
             </button>
           </div>
         </div>
@@ -257,35 +280,54 @@ export function PdfViewerPanel() {
       {isDragging && <div id="pdf-viewer-drag-overlay" />}
 
       {/* Content Area */}
-      <div 
-        ref={containerRef} 
+      <div
+        ref={containerRef}
         className="pdf-viewer-content"
+        style={{ overflow: 'hidden', position: 'relative' }}
       >
         {isOpen && loading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-slate-100/80 z-30">
-            <Loader2 className="animate-spin text-slate-500" size={32} />
+          <div className="absolute inset-0 flex items-center justify-center bg-[var(--surface)]/80 z-30">
+            <Loader2 className="animate-spin text-[var(--brand)]" size={32} />
           </div>
         )}
 
         {isOpen && fileUrl ? (
-          <Document
-            file={fileUrl}
-            onLoadSuccess={onDocumentLoadSuccess}
-            onLoadError={onDocumentLoadError}
-            loading={null}
+          <div
+            className="pdf-transform-wrapper"
+            style={{
+              transform: `translate(${panOffset.x}px, ${panOffset.y}px)`,
+              transformOrigin: 'center center',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: isPanning ? 'grabbing' : 'grab',
+              width: '100%',
+              height: '100%',
+              position: 'absolute',
+              userSelect: 'text',
+            }}
+            onMouseDown={handleMouseDown}
           >
-            <Page
-              pageNumber={currentPage}
-              width={pageCalculatedWidth}
-              onLoadSuccess={onPageLoadSuccess}
-              renderAnnotationLayer={false}
-              renderTextLayer={true}
+            <Document
+              file={fileUrl}
+              onLoadSuccess={onDocumentLoadSuccess}
+              onLoadError={onDocumentLoadError}
               loading={null}
-            />
-          </Document>
+            >
+              <Page
+                pageNumber={currentPage}
+                width={baseWidth * zoomLevel}
+                scale={1.15}
+                onLoadSuccess={onPageLoadSuccess}
+                renderAnnotationLayer={false}
+                renderTextLayer
+                loading={null}
+              />
+            </Document>
+          </div>
         ) : (
           isOpen && (
-            <div className="text-slate-400 text-sm flex items-center justify-center h-full w-full">
+            <div className="text-[var(--text-muted)] text-sm flex items-center justify-center h-full w-full">
               No document loaded
             </div>
           )

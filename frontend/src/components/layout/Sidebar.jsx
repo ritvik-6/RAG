@@ -53,13 +53,13 @@ export function Sidebar({ userId }) {
         {/* Documents Section */}
         <div className="sidebar-section">
           <div
-            className="flex items-center gap-1.5 cursor-pointer py-1.5 hover:bg-slate-100/50 rounded px-1.5 select-none transition-colors"
+            className="flex items-center gap-1.5 cursor-pointer py-1.5 hover:bg-[var(--border-muted)] rounded px-1.5 select-none transition-colors"
             onClick={() => setDocsExpanded(!docsExpanded)}
           >
             {docsExpanded ? (
-              <ChevronDown size={14} className="text-slate-400 shrink-0" />
+              <ChevronDown size={14} className="text-[var(--text-muted)] shrink-0" />
             ) : (
-              <ChevronRight size={14} className="text-slate-400 shrink-0" />
+              <ChevronRight size={14} className="text-[var(--text-muted)] shrink-0" />
             )}
             <h3>Documents</h3>
           </div>
@@ -78,16 +78,16 @@ export function Sidebar({ userId }) {
         <div className="sidebar-section">
           <div className="sessions-header select-none">
             <div
-              className="flex items-center gap-1.5 cursor-pointer py-1.5 hover:bg-slate-100/50 rounded px-1.5 transition-colors"
+              className="flex items-center gap-1.5 cursor-pointer py-1.5 hover:bg-[var(--border-muted)] rounded px-1.5 transition-colors"
               onClick={() => setSessionsExpanded(!sessionsExpanded)}
             >
               {sessionsExpanded ? (
-                <ChevronDown size={14} className="text-slate-400 shrink-0" />
+                <ChevronDown size={14} className="text-[var(--text-muted)] shrink-0" />
               ) : (
-                <ChevronRight size={14} className="text-slate-400 shrink-0" />
+                <ChevronRight size={14} className="text-[var(--text-muted)] shrink-0" />
               )}
               <h3 className="flex items-center gap-1.5">
-                <MessageSquare size={14} className="shrink-0 text-slate-400" />
+                <MessageSquare size={14} className="shrink-0 text-[var(--text-muted)]" />
                 Chat Sessions
               </h3>
             </div>

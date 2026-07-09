@@ -9,7 +9,7 @@ export function SessionList() {
   const deleteSession = useSessionStore((s) => s.deleteSession);
   const renameSession = useSessionStore((s) => s.renameSession);
 
-  const sessionIds = Object.keys(chatSessionsMemory);
+  const sessionOrder = useSessionStore((s) => s.sessionOrder);
 
   const handleDelete = async (sessionId) => {
     if (!confirm('Delete this session? This cannot be undone.')) return;
@@ -22,7 +22,7 @@ export function SessionList() {
 
   return (
     <>
-      {sessionIds.map((sessionId, index) => {
+      {sessionOrder.map((sessionId, index) => {
         const metadata = sessionMetadata[sessionId];
         const sessionName = metadata?.session_name || `Chat Session ${index + 1}`;
         

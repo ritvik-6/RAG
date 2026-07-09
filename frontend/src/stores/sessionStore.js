@@ -6,6 +6,7 @@ export const useSessionStore = create((set, get) => ({
   activeSessionId: null,
   chatSessionsMemory: {},
   sessionMetadata: {}, // Stores { session_name, thread_id } for each session
+  sessionOrder: [],
   isStreaming: false,
 
   streamingSessionId: null,
@@ -84,6 +85,7 @@ export const useSessionStore = create((set, get) => ({
           activeSessionId: null,
           chatSessionsMemory: {},
           sessionMetadata: {},
+          sessionOrder: [],
         });
       } else {
         const chatSessionsMemory = {};
@@ -103,7 +105,7 @@ export const useSessionStore = create((set, get) => ({
           };
         });
 
-        const sessionIds = Object.keys(sessions);
+        const sessionIds = Object.keys(sessions).reverse();
 
         // Only select a session if the URL explicitly names one.
         // Bare root ("/") always means blank landing state — no auto-resume.
@@ -118,6 +120,7 @@ export const useSessionStore = create((set, get) => ({
         set({
           chatSessionsMemory,
           sessionMetadata,
+          sessionOrder: sessionIds,
           activeSessionId: initialActiveId,
         });
       }
@@ -128,6 +131,7 @@ export const useSessionStore = create((set, get) => ({
         activeSessionId: null,
         chatSessionsMemory: {},
         sessionMetadata: {},
+        sessionOrder: [],
       });
     }
   },
@@ -155,6 +159,7 @@ export const useSessionStore = create((set, get) => ({
         ...state.sessionMetadata,
         [newId]: { session_name: 'New Conversation', thread_id: null },
       },
+      sessionOrder: [newId, ...state.sessionOrder],
     }));
     return newId;
   },
@@ -186,9 +191,11 @@ export const useSessionStore = create((set, get) => ({
       delete nextMemory[sessionId];
       const nextMetadata = { ...state.sessionMetadata };
       delete nextMetadata[sessionId];
+      const nextOrder = state.sessionOrder.filter((id) => id !== sessionId);
       return {
         chatSessionsMemory: nextMemory,
         sessionMetadata: nextMetadata,
+        sessionOrder: nextOrder,
       };
     });
 

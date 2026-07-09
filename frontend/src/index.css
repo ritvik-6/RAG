@@ -8,14 +8,14 @@
   --bg-canvas: #f8fafc;        /* Soft zinc/slate off-white backdrop */
   --bg-sidebar: #fafafa;       /* Warmer off-white sidebar background */
   --surface: #ffffff;
-  --brand: #4f46e5;            /* Indigo-600 premium action accent */
-  --brand-dark: #4338ca;       /* Indigo-700 active accent */
-  --brand-light: rgba(99, 102, 241, 0.15); /* Soft transparent focus halo */
+  --brand: #424141;            /* Indigo-600 premium action accent */
+  --brand-dark: #646467;       /* Indigo-700 active accent */
+  --brand-light:#e8e8ea; /* Soft transparent focus halo */
   --text-dark: #09090b;        /* Zinc-950 deep primary text */
   --text-muted: #71717a;       /* Zinc-500 secondary/meta text */
   --border: #e4e4e7;           /* Zinc-200 structural borders */
   --border-muted: #f4f4f5;     /* Zinc-100 component border lines */
-  --bubble-user: #18181b;      /* Dark Zinc message bubble background */
+  --bubble-user: #eeeeee;      /* Dark Zinc message bubble background */
   --bubble-ai: #ffffff;        /* White AI message bubble background */
   --danger: #ef4444;
   --danger-bg: #fee2e2;
@@ -256,17 +256,16 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 10px;
-  background: var(--surface);
-  border: 1px solid var(--border-muted);
+  padding: 3px 6px;
+  background: transparent;
+  border: none;
   border-radius: var(--radius-sm);
   gap: 6px;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition: background 0.15s ease;
 }
 
 .doc-item:hover {
-  background: #fafafa;
-  border-color: var(--border);
+  background: var(--border-muted);
 }
 
 .doc-name {
@@ -313,26 +312,24 @@ hr.divider {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 10px;
+  padding: 3px 9px;
   border-radius: var(--radius-sm);
-  background: var(--surface);
-  border: 1px solid var(--border-muted);
+  background: transparent;
+  border: none;
   cursor: pointer;
   font-size: 13px;
   font-weight: 500;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease;
   gap: 8px;
 }
 
 .session-item:hover {
-  background: #fafafa;
-  border-color: var(--border);
+  background: var(--brand-light);
 }
 
 .active-session {
-  background: #f5f3ff; /* light violet/indigo */
+  background: var(--brand-light);
   color: var(--brand);
-  border-color: #c7d2fe; /* indigo-200 */
 }
 
 .session-item span {
@@ -393,7 +390,7 @@ hr.divider {
 
 .user-align {
   background: var(--bubble-user);
-  color: white;
+  color: rgb(0, 0, 0);
   align-self: flex-end;
   border-bottom-right-radius: 2px;
   margin-bottom: 8px;
@@ -479,7 +476,7 @@ hr.divider {
 }
 
 .citation-item.active .citation-page {
-  color: #bfdbfe;
+  color: #bac7d6;
 }
 
 .citation-number {
@@ -525,7 +522,7 @@ hr.divider {
 }
 
 #pdf-viewer-resize-handle:hover {
-  background: var(--primary);
+  background: rgb(151, 154, 151);
   opacity: 0.4;
 }
 

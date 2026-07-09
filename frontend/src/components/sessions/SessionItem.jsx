@@ -63,7 +63,6 @@ export function SessionItem({ sessionName, isActive, onSelect, onDelete, onRenam
   return (
     <div
       className={`session-item${isActive ? ' active-session' : ''}`}
-      onDoubleClick={() => setIsEditing(true)}
     >
       {isEditing ? (
         <input

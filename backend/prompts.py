@@ -44,3 +44,23 @@ Convert the provided metadata into a clean markdown table.
 Columns: File, Pages, Upload Time.
 Report only what exists. Do not infer content. No citations.
 """
+
+def get_query_decomposition_prompt() -> str:
+    return """You split a user's question into independent, atomic sub-questions.
+
+RULES:
+- If the question asks about only ONE thing, return a JSON list with that one question unchanged.
+- If it asks about MULTIPLE distinct things, split into separate, self-contained sub-questions.
+- Do NOT add information not implied by the original question.
+- Output ONLY a JSON array of strings. No commentary, no markdown, no explanation.
+
+Examples:
+Input: "Who is John and what is his salary?"
+Output: ["Who is John?", "What is John's salary?"]
+
+Input: "What are Legal Remedies?"
+Output: ["What are Legal Remedies?"]
+
+Input: "Who headed the committee and what does the report say about revenue?"
+Output: ["Who headed the committee?", "What does the report say about revenue?"]
+"""
