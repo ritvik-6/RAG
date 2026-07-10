@@ -82,22 +82,20 @@ export function renderMarkdown(text) {
  *   cleanText  — text with markers removed
  *   citations  — array of { index, filename, page }
  */
-export function parseCitations(rawText) {
+export function parseCitations(rawText, citationChunks = {}) {
   const citations = [];
   const seen = new Map();
 
-  const cleanText = rawText.replace(/\[\[cite:([^:\]]+):(\d+)\]\]/g, (_match, filename, page) => {
-    const key = `${filename}:${page}`;
+  const cleanText = rawText.replace(/\[\[cite:([^:\]]+):(\d+)\]\]/g, (_match, filename, page) => {    const key = `${filename}:${page}`;
     let index;
 
     if (seen.has(key)) {
       index = seen.get(key);
     } else {
       index = citations.length + 1;
-      citations.push({ index, filename, page: parseInt(page, 10) });
+      citations.push({ index, filename, page: parseInt(page, 10), snippet: citationChunks[key] || null });
       seen.set(key, index);
     }
-
     return `<sup class="citation-ref" data-index="${index}">[${index}]</sup>`;
   });
 

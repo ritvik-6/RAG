@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS chat_messages (
     session_id UUID REFERENCES chat_sessions(session_id) ON DELETE CASCADE,
     sender VARCHAR(50) NOT NULL, -- 'user' or 'ai'
     message_text TEXT NOT NULL,
+    citation_chunks JSONB DEFAULT '{}'::jsonb,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 

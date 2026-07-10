@@ -4,6 +4,9 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
   Loader2
 } from 'lucide-react';
 import { Document, Page, pdfjs } from 'react-pdf';
@@ -24,8 +27,9 @@ export function PdfViewerPanel() {
   const close = usePdfStore((s) => s.close);
   const filename = usePdfStore((s) => s.filename);
   const storePage = usePdfStore((s) => s.page);
+  const snippet = usePdfStore((s) => s.snippet);
 
-  // Resize and drag states
+  // Panel resize states
   const [width, setWidth] = useState(DEFAULT_WIDTH);
   const [dragWidth, setDragWidth] = useState(null); // live preview only
   const draggingRef = useRef(false);
@@ -34,18 +38,16 @@ export function PdfViewerPanel() {
   const [numPages, setNumPages] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [aspectRatio, setAspectRatio] = useState(1.414); // Default standard A4 ratio
 
-  // Zoom & Pan states
+  // Zoom states
   const [zoomLevel, setZoomLevel] = useState(1.0);
-  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
-  const [isPanning, setIsPanning] = useState(false);
-  const panStartRef = useRef({ x: 0, y: 0 });
 
   // Container measurement
   const containerRef = useRef(null);
   const [containerWidth, setContainerWidth] = useState(0);
 
-  // Derive file URL directly from user ID and filename using getFileUrl helper
+  // Derive file URL directly from user ID and filename
   const userId = getUserId() || '';
   const diskFilename = filename ? `${userId}_${filename}` : '';
   const fileUrl = filename ? apiService.getFileUrl(diskFilename, 1).split('#')[0] : '';
@@ -57,10 +59,9 @@ export function PdfViewerPanel() {
     }
   }, [storePage]);
 
-  // When the page index or active document changes, reset zoom and pan variables to defaults
+  // When the page index or active document changes, reset zoom level to default
   useEffect(() => {
     setZoomLevel(1.0);
-    setPanOffset({ x: 0, y: 0 });
   }, [currentPage, fileUrl]);
 
   // When the file URL changes, reset total page count and trigger loading state
@@ -76,7 +77,6 @@ export function PdfViewerPanel() {
     if (!containerRef.current) return;
 
     const observer = new ResizeObserver((entries) => {
-      // Avoid re-renders of the canvas while dragging to optimize performance
       if (draggingRef.current) return;
       if (entries[0]) {
         setContainerWidth(entries[0].contentRect.width);
@@ -107,7 +107,6 @@ export function PdfViewerPanel() {
         draggingRef.current = false;
         document.body.style.cursor = '';
         document.body.style.userSelect = '';
-        // Commit the width — this is the only point the panel content actually reflows
         setDragWidth((finalWidth) => {
           if (finalWidth != null) setWidth(finalWidth);
           return null;
@@ -137,11 +136,14 @@ export function PdfViewerPanel() {
     setLoading(false);
   };
 
-  const onPageLoadSuccess = () => {
+  const onPageLoadSuccess = (page) => {
+    if (page.width) {
+      setAspectRatio(page.height / page.width);
+    }
     setLoading(false);
   };
 
-  // Navigation handlers
+  // Navigation and zoom handlers
   const goPrev = () => {
     setCurrentPage((p) => Math.max(1, p - 1));
   };
@@ -150,18 +152,27 @@ export function PdfViewerPanel() {
     setCurrentPage((p) => Math.min(numPages || 1, p + 1));
   };
 
-  // Wheel Zoom event handler centering on cursor offsets
+  const zoomIn = () => {
+    setZoomLevel((z) => Math.min(4.0, z + 0.15));
+  };
+
+  const zoomOut = () => {
+    setZoomLevel((z) => Math.max(0.5, z - 0.15));
+  };
+
+  const resetZoom = () => {
+    setZoomLevel(1.0);
+  };
+
+  // Wheel Zoom event handler (Ctrl/Cmd + Scroll wheel)
   const handleWheel = useCallback((e) => {
-    if (!(e.ctrlKey || e.metaKey)) return;
-
-    e.preventDefault();
-
-    const zoomFactor = 1.1;
-    const factor = e.deltaY < 0 ? zoomFactor : 1 / zoomFactor;
-
-    setZoomLevel((prev) =>
-      Math.min(4.0, Math.max(0.5, prev * factor))
-    );
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      const zoomFactor = 1.1;
+      const direction = e.deltaY < 0 ? 1 : -1;
+      const factor = direction > 0 ? zoomFactor : 1 / zoomFactor;
+      setZoomLevel((prevZoom) => Math.min(4.0, Math.max(0.5, prevZoom * factor)));
+    }
   }, []);
 
   // Bind non-passive wheel event listener to container
@@ -177,43 +188,106 @@ export function PdfViewerPanel() {
     };
   }, [handleWheel]);
 
-  // Drag-to-pan handlers
-  const handleMouseDown = useCallback((e) => {
-    if (e.button !== 0) return;
-    if (zoomLevel <= 1) return;
-
-    setIsPanning(true);
-    panStartRef.current = {
-      x: e.clientX - panOffset.x,
-      y: e.clientY - panOffset.y,
-    };
-
-    e.preventDefault();
-  }, [zoomLevel, panOffset]);
-
-  const handleMouseMove = useCallback((e) => {
-    if (!isPanning) return;
-    const newX = e.clientX - panStartRef.current.x;
-    const newY = e.clientY - panStartRef.current.y;
-    setPanOffset({ x: newX, y: newY });
-  }, [isPanning]);
-
-  const handleMouseUp = useCallback(() => {
-    setIsPanning(false);
-  }, []);
-
+  // MutationObserver-driven citation highlighter
   useEffect(() => {
-    if (isPanning) {
-      window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
-    }
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isPanning, handleMouseMove, handleMouseUp]);
+    let observer;
 
-  // Subtraction of bounds horizontal padding
+    const highlightText = () => {
+      const prevHighlights = document.querySelectorAll('.pdf-highlight-match');
+      prevHighlights.forEach((el) => {
+        el.classList.remove('pdf-highlight-match');
+      });
+
+      if (!snippet) return;
+
+      const textLayer = containerRef.current?.querySelector('.textLayer, .react-pdf__Page__textContent');
+      if (!textLayer) return;
+
+      const spans = Array.from(textLayer.querySelectorAll('span'));
+      if (spans.length === 0) return;
+
+      const cleanSnippet = snippet.replace(/\s+/g, ' ').trim().toLowerCase();
+      if (!cleanSnippet) return;
+
+      const snippetWords = cleanSnippet.split(' ').filter(Boolean);
+      if (snippetWords.length === 0) return;
+
+      const spanInfo = spans.map((span) => ({
+        span,
+        text: span.textContent.replace(/\s+/g, ' ').trim().toLowerCase(),
+      }));
+
+      let combinedText = '';
+      const spanRanges = [];
+      
+      spanInfo.forEach((info) => {
+        const startIdx = combinedText.length;
+        combinedText += info.text + ' ';
+        const endIdx = combinedText.length;
+        spanRanges.push({ startIdx, endIdx, span: info.span });
+      });
+
+      // Try exact match first
+      const idx = combinedText.indexOf(cleanSnippet);
+      if (idx !== -1) {
+        const matchStart = idx;
+        const matchEnd = idx + cleanSnippet.length;
+        let firstMatchSpan = null;
+
+        spanRanges.forEach((range) => {
+          if (range.startIdx < matchEnd && range.endIdx > matchStart) {
+            range.span.classList.add('pdf-highlight-match');
+            if (!firstMatchSpan) firstMatchSpan = range.span;
+          }
+        });
+
+        if (firstMatchSpan) {
+          firstMatchSpan.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        return;
+      }
+
+      // Fuzzy phrase match fallback (using 4-word sliding window)
+      const phraseLen = Math.min(4, snippetWords.length);
+      let firstMatchSpan = null;
+
+      for (let start = 0; start <= snippetWords.length - phraseLen; start++) {
+        const phrase = snippetWords.slice(start, start + phraseLen).join(' ');
+        const pIdx = combinedText.indexOf(phrase);
+        if (pIdx !== -1) {
+          const matchStart = pIdx;
+          const matchEnd = pIdx + phrase.length;
+          spanRanges.forEach((range) => {
+            if (range.startIdx < matchEnd && range.endIdx > matchStart) {
+              range.span.classList.add('pdf-highlight-match');
+              if (!firstMatchSpan) firstMatchSpan = range.span;
+            }
+          });
+        }
+      }
+
+      if (firstMatchSpan) {
+        firstMatchSpan.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    };
+
+    highlightText();
+
+    const targetNode = containerRef.current;
+    if (targetNode) {
+      observer = new MutationObserver(() => {
+        highlightText();
+      });
+      observer.observe(targetNode, { childList: true, subtree: true });
+    }
+
+    return () => {
+      if (observer) {
+        observer.disconnect();
+      }
+    };
+  }, [snippet, currentPage, loading]);
+
   const baseWidth = containerWidth > 32 ? containerWidth - 32 : 280;
 
   return (
@@ -248,7 +322,7 @@ export function PdfViewerPanel() {
 
       {/* Toolbar */}
       {isOpen && (
-        <div className="pdf-viewer-toolbar justify-center">
+        <div className="pdf-viewer-toolbar flex items-center justify-center gap-4">
           {/* Navigation */}
           <div className="flex items-center gap-1">
             <button
@@ -273,17 +347,50 @@ export function PdfViewerPanel() {
               <ChevronRight size={18} />
             </button>
           </div>
+
+          {/* Zoom Actions */}
+          <div className="flex items-center gap-1.5 border-l border-[var(--border)] pl-4">
+            <button
+              type="button"
+              className="p-1 hover:bg-[var(--border-muted)] rounded disabled:opacity-30 transition-colors text-[var(--text-muted)]"
+              onClick={zoomOut}
+              disabled={zoomLevel <= 0.5 || loading}
+              title="Zoom out"
+            >
+              <ZoomOut size={18} />
+            </button>
+            <button
+              type="button"
+              className="p-1 hover:bg-[var(--border-muted)] rounded disabled:opacity-30 transition-colors text-[var(--text-muted)]"
+              onClick={resetZoom}
+              disabled={loading}
+              title="Reset zoom"
+            >
+              <RotateCcw size={16} />
+            </button>
+            <span className="text-xs font-semibold min-w-[40px] text-center text-[var(--text-muted)]">
+              {Math.round(zoomLevel * 100)}%
+            </span>
+            <button
+              type="button"
+              className="p-1 hover:bg-[var(--border-muted)] rounded disabled:opacity-30 transition-colors text-[var(--text-muted)]"
+              onClick={zoomIn}
+              disabled={zoomLevel >= 4.0 || loading}
+              title="Zoom in"
+            >
+              <ZoomIn size={18} />
+            </button>
+          </div>
         </div>
       )}
 
-      {/* Overlay blocks interaction while dragging */}
       {isDragging && <div id="pdf-viewer-drag-overlay" />}
 
       {/* Content Area */}
       <div
         ref={containerRef}
         className="pdf-viewer-content"
-        style={{ overflow: 'hidden', position: 'relative' }}
+        style={{ overflow: 'auto', position: 'relative' }}
       >
         {isOpen && loading && (
           <div className="absolute inset-0 flex items-center justify-center bg-[var(--surface)]/80 z-30">
@@ -293,37 +400,43 @@ export function PdfViewerPanel() {
 
         {isOpen && fileUrl ? (
           <div
-            className="pdf-transform-wrapper"
+            className="pdf-scaffolding-container"
             style={{
-              transform: `translate(${panOffset.x}px, ${panOffset.y}px)`,
-              transformOrigin: 'center center',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: isPanning ? 'grabbing' : 'grab',
-              width: '100%',
-              height: '100%',
-              position: 'absolute',
-              userSelect: 'text',
+              width: `${baseWidth * zoomLevel}px`,
+              height: `${baseWidth * aspectRatio * zoomLevel}px`,
+              position: 'relative',
+              margin: '0 auto',
             }}
-            onMouseDown={handleMouseDown}
           >
-            <Document
-              file={fileUrl}
-              onLoadSuccess={onDocumentLoadSuccess}
-              onLoadError={onDocumentLoadError}
-              loading={null}
+            <div
+              className="pdf-transform-wrapper"
+              style={{
+                transform: `scale(${zoomLevel})`,
+                transformOrigin: 'top left',
+                width: `${baseWidth}px`,
+                height: `${baseWidth * aspectRatio}px`,
+                position: 'absolute',
+                top: 0,
+                left: 0,
+              }}
             >
-              <Page
-                pageNumber={currentPage}
-                width={baseWidth * zoomLevel}
-                scale={1.15}
-                onLoadSuccess={onPageLoadSuccess}
-                renderAnnotationLayer={false}
-                renderTextLayer
+              <Document
+                file={fileUrl}
+                onLoadSuccess={onDocumentLoadSuccess}
+                onLoadError={onDocumentLoadError}
                 loading={null}
-              />
-            </Document>
+              >
+                <Page
+                  pageNumber={currentPage}
+                  width={baseWidth}
+                  scale={1.75}
+                  onLoadSuccess={onPageLoadSuccess}
+                  renderAnnotationLayer={false}
+                  renderTextLayer={true}
+                  loading={null}
+                />
+              </Document>
+            </div>
           </div>
         ) : (
           isOpen && (

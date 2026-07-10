@@ -17,7 +17,7 @@ async def get_user_sessions(user_id: str):
         rows = await conn.fetch(
             """
             SELECT s.session_id, s.session_name, s.thread_id,
-                   m.sender, m.message_text, m.created_at, t.latency_ms
+                   m.sender, m.message_text, m.created_at, m.citation_chunks, t.latency_ms
             FROM chat_sessions s
             LEFT JOIN chat_messages m ON s.session_id = m.session_id
             LEFT JOIN thread_messages t ON m.message_id = t.message_id
@@ -39,6 +39,7 @@ async def get_user_sessions(user_id: str):
 
     result = {}
     session_meta = {}
+    import json
     for r in rows:
         sid = str(r["session_id"])
         if sid not in result:
@@ -48,11 +49,24 @@ async def get_user_sessions(user_id: str):
                 "thread_id": str(r["thread_id"]) if r["thread_id"] else None
             }
         if r["sender"] is not None:
+            # Parse json / dict for citation_chunks
+            cit_raw = r["citation_chunks"]
+            cit_dict = {}
+            if cit_raw:
+                if isinstance(cit_raw, str):
+                    try:
+                        cit_dict = json.loads(cit_raw)
+                    except Exception:
+                        pass
+                elif isinstance(cit_raw, dict):
+                    cit_dict = cit_raw
+
             result[sid].append({
                 "sender": r["sender"],
                 "text": r["message_text"],
                 "created_at": r["created_at"].isoformat() if r["created_at"] else None,
-                "latency_ms": r["latency_ms"]
+                "latency_ms": r["latency_ms"],
+                "citation_chunks": cit_dict
             })
 
     return {

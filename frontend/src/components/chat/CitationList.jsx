@@ -5,7 +5,7 @@ export function CitationList({ citations, activeCitationKey, onCitationClick }) 
 
   return (
     <div className="citation-list">
-      {citations.map(({ index, filename, page }) => {
+      {citations.map(({ index, filename, page, snippet }) => {
         const key = `${filename}:${page}`;
         return (
           <CitationItem
@@ -14,7 +14,7 @@ export function CitationList({ citations, activeCitationKey, onCitationClick }) 
             filename={filename}
             page={page}
             isActive={activeCitationKey === key}
-            onClick={() => onCitationClick(filename, page, key)}
+            onClick={() => onCitationClick(filename, page, key, snippet)}
           />
         );
       })}

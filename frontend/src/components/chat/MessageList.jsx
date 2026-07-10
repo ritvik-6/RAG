@@ -19,10 +19,10 @@ export function MessageList() {
   const streamingText = useSessionStore((s) => s.streamingText);
   const streamingStatus = useSessionStore((s) => s.streamingStatus);
 
-  const handleCitationClick = (filename, page, key) => {
+  const handleCitationClick = (filename, page, key, snippet) => {
     const isActive = activeCitationKey === key;
     setActiveCitationKey(isActive ? null : key);
-    togglePdf(filename, page);
+    togglePdf(filename, page, snippet);
   };
 
   // Blank landing state 
@@ -45,13 +45,14 @@ export function MessageList() {
       {messages.map((msg, index) => {
         const citationKey = `${index}-${msg.classType}`;
         const { citations } =
-          msg.classType === 'ai-align' ? parseCitations(msg.text) : { citations: [] };
+          msg.classType === 'ai-align' ? parseCitations(msg.text, msg.citationChunks) : { citations: [] };
 
         return (
           <Fragment key={citationKey}>
             <MessageBubble
               text={msg.text}
               classType={msg.classType}
+              citationChunks={msg.citationChunks}
               createdAt={msg.created_at}
               latencyMs={msg.latency_ms}
             />
@@ -59,7 +60,7 @@ export function MessageList() {
               <CitationList
                 citations={citations}
                 activeCitationKey={activeCitationKey}
-                onCitationClick={(filename, page, key) => handleCitationClick(filename, page, key)}
+                onCitationClick={(filename, page, key, snippet) => handleCitationClick(filename, page, key, snippet)}
               />
             )}
           </Fragment>

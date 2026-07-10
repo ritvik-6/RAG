@@ -57,9 +57,9 @@ async def process_pdf_upload_task(document_id: str, file_path: str, filename: st
         splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
         splits = await asyncio.to_thread(splitter.split_documents, docs)
 
-        # 3. Embedding Generation (batched in size 128)
+        # 3. Embedding Generation (batched in size 256)
         await update_status("embedding")
-        batch_size = 128
+        batch_size = 256
         vectors = []
         for i in range(0, len(splits), batch_size):
             batch = [s.page_content for s in splits[i:i + batch_size]]
@@ -185,8 +185,11 @@ async def upload_pdf(
 
     document_uuid = str(uuid.uuid4())
     file_path = os.path.join(UPLOAD_DIR, f"{user_id}_{file.filename}")
-    contents = await file.read()
-    await asyncio.to_thread(lambda: open(file_path, "wb").write(contents))
+    with open(file_path, "wb") as f:
+        while chunk := await file.read(1024 * 1024):  # 1 MB chunks
+            f.write(chunk)
+
+    file_size = os.path.getsize(file_path)
 
     # Pre-register document row in the SQL tracking ledger with status='pending'
     async with pool.acquire() as conn:
@@ -195,7 +198,7 @@ async def upload_pdf(
             INSERT INTO documents (document_id, user_id, filename, page_count, status, metadata)
             VALUES ($1, $2, $3, 0, 'pending', $4::jsonb);
             """,
-            document_uuid, user_id, file.filename, json.dumps({"file_size_bytes": len(contents)})
+            document_uuid, user_id, file.filename, json.dumps({"file_size_bytes": file_size})
         )
 
     # Dispatch CPU-intensive parsing and embedding steps to background tasks

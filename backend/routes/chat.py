@@ -118,6 +118,7 @@ async def websocket_chat(websocket: WebSocket):
                 "session_id": session_id,
             }))
             full_response = ""
+            citation_chunks = {}
             active_tool = None
             tool_called = False
 
@@ -140,6 +141,7 @@ async def websocket_chat(websocket: WebSocket):
                         "session_id": session_id,
                     }))
                 elif event_name == "on_tool_end":
+                    ended_tool_name = event.get("name")
                     active_tool = None
 
                     await websocket.send_text(json.dumps({
@@ -152,9 +154,29 @@ async def websocket_chat(websocket: WebSocket):
                     # Tool output may be a ToolMessage object or a plain string
                     tool_text = getattr(output, "content", output)
                     if isinstance(tool_text, str) and tool_text:
-                        full_response = tool_text
+                        answer_text = tool_text
+                        citation_chunks = {}
+                        if ended_tool_name == "rag_sub_agent":
+                            try:
+                                parsed = json.loads(tool_text)
+                                answer_text = parsed.get("answer", tool_text)
+                                citation_chunks = parsed.get("citations", {})
+                            except json.JSONDecodeError:
+                                # Failure-path strings from run_rag_sub_agent aren't
+                                # JSON-wrapped — fall back to using them as-is.
+                                pass
+
+                        full_response = answer_text
+
+                        if citation_chunks:
+                            await websocket.send_text(json.dumps({
+                                "type": "citation_chunks",
+                                "data": citation_chunks,
+                                "session_id": session_id,
+                            }))
+
                         # Simulate streaming by sending word-sized chunks
-                        words = tool_text.split(" ")
+                        words = answer_text.split(" ")
                         for i, word in enumerate(words):
                             piece = word if i == 0 else " " + word
                             await websocket.send_text(json.dumps({"type": "token", "data": piece,"session_id": session_id}))
@@ -174,6 +196,21 @@ async def websocket_chat(websocket: WebSocket):
                     collection_name=collection_name,
                     user_id=user_id,
                 )
+
+                citation_chunks = {}
+                try:
+                    parsed = json.loads(full_response)
+                    full_response = parsed.get("answer", full_response)
+                    citation_chunks = parsed.get("citations", {})
+                except json.JSONDecodeError:
+                    pass
+
+                if citation_chunks:
+                    await websocket.send_text(json.dumps({
+                        "type": "citation_chunks",
+                        "data": citation_chunks,
+                        "session_id": session_id,
+                    }))
 
                 # Stream the fallback response
                 words = full_response.split(" ")
@@ -204,11 +241,11 @@ async def websocket_chat(websocket: WebSocket):
                 # Capture the message_id using RETURNING
                 row = await conn.fetchrow(
                     """
-                    INSERT INTO chat_messages (session_id, sender, message_text) 
-                    VALUES ($1, $2, $3) 
+                    INSERT INTO chat_messages (session_id, sender, message_text, citation_chunks) 
+                    VALUES ($1, $2, $3, $4) 
                     RETURNING message_id
                     """,
-                    session_id, "ai", full_response
+                    session_id, "ai", full_response, json.dumps(citation_chunks)
                 )
                 ai_message_id = row["message_id"] if row else None
                 

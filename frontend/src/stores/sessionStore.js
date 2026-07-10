@@ -12,6 +12,7 @@ export const useSessionStore = create((set, get) => ({
   streamingSessionId: null,
   streamingText: "",
   streamingStatus: "Thinking...",
+  pendingCitationChunks: {},
 
   startStream: (sessionId) =>
     set({
@@ -19,7 +20,9 @@ export const useSessionStore = create((set, get) => ({
       streamingText: '',
       streamingStatus: 'Understanding your question...',
       isStreaming: true,
+      pendingCitationChunks: {},
     }),
+  setCitationChunks: (chunks) => set({ pendingCitationChunks: chunks }),
 
   appendStreamToken: (sessionId, token) => {
     if (sessionId !== get().streamingSessionId) return;
@@ -51,6 +54,7 @@ export const useSessionStore = create((set, get) => ({
   },
 
   finalizeAiMessage: (sessionId, rawText, latencyMs) => {
+    const citationChunks = get().pendingCitationChunks;
     set((state) => ({
       chatSessionsMemory: {
         ...state.chatSessionsMemory,
@@ -60,11 +64,13 @@ export const useSessionStore = create((set, get) => ({
             text: rawText,
             classType: 'ai-align',
             latency_ms: latencyMs,
-            created_at: new Date().toISOString()
+            created_at: new Date().toISOString(),
+            citationChunks,
           }
         ],
       },
       isStreaming: false,
+      pendingCitationChunks: {},
     }));
   },
 
@@ -111,6 +117,7 @@ export const useSessionStore = create((set, get) => ({
             classType: m.sender === 'user' ? 'user-align' : 'ai-align',
             created_at: m.created_at,
             latency_ms: m.latency_ms,
+            citationChunks: m.citation_chunks || {},
           }));
 
           sessionMetadata[sid] = {

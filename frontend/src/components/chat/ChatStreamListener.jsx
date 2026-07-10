@@ -10,12 +10,16 @@ export function ChatStreamListener() {
   const setStreamingStatus = useSessionStore((s) => s.setStreamingStatus);
 
   useEffect(() => {
+    const setCitationChunks = useSessionStore.getState().setCitationChunks;
     const unsubscribe = chatService.subscribe((event, payload) => {
       if (event === 'token') {
         appendStreamToken(payload.sessionId, payload.data);
       } else if (event === 'status') {
         setStreamingStatus(payload.data);
       }
+      else if (event === 'citation_chunks') {
+        setCitationChunks(payload.data);
+       }
       else if (event === 'end') {
         const { streamingSessionId, streamingText } = useSessionStore.getState();
         if (payload.sessionId === streamingSessionId) {

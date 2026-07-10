@@ -7,20 +7,21 @@ export const usePdfStore = create((set, get) => ({
   currentKey: null,
   filename: null,
   page: null,
+  snippet: null,
   iframeSrc: '',
   title: 'Document Viewer',
 
-  toggle: (filename, page) => {
+  toggle: (filename, page, snippet) => {
     const key = `${filename}:${page}`;
     const { isOpen, currentKey } = get();
     if (isOpen && currentKey === key) {
       get().close();
       return;
     }
-    get().open(filename, page, key);
+    get().open(filename, page, key, snippet);
   },
 
-  open: (filename, page, key) => {
+  open: (filename, page, key, snippet) => {
     const userId = getUserId() || '';
     const diskFilename = `${userId}_${filename}`;
     const url = apiService.getFileUrl(diskFilename, page);
@@ -30,6 +31,7 @@ export const usePdfStore = create((set, get) => ({
       currentKey: key || `${filename}:${page}`,
       filename,
       page,
+      snippet: snippet || null,
       iframeSrc: url,
       title: `${filename} — Page ${page}`,
     });
@@ -41,6 +43,7 @@ export const usePdfStore = create((set, get) => ({
       currentKey: null,
       filename: null,
       page: null,
+      snippet: null,
       iframeSrc: '',
       title: 'Document Viewer',
     });

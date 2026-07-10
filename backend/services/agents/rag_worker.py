@@ -75,6 +75,7 @@ async def run_rag_sub_agent(
     # 3. Merge + dedupe chunks across all sub-question retrievals
     seen_texts = set()
     context_parts = []
+    citation_chunks = {}
     for hits in all_hits:
         for hit in hits:
             entity = hit["entity"]
@@ -85,9 +86,14 @@ async def run_rag_sub_agent(
             source = entity.get("source", "unknown.pdf")
             page = entity.get("page_number", 1)
             context_parts.append(f"[Source: {source} | Page: {page}]\n{text}")
+            key = f"{source}:{page}"
+            citation_chunks.setdefault(key, []).append(text)
 
     if not context_parts:
-        return "I could not find relevant information about this in the uploaded document."
+        return json.dumps({
+           "answer": "I could not find relevant information about this in the uploaded document.",
+            "citations": {}
+       })
 
     context_str = "\n\n---\n\n".join(context_parts)
     sub_q_list = "\n".join(f"- {sq}" for sq in sub_questions)
@@ -117,4 +123,8 @@ async def run_rag_sub_agent(
         container.value = formatted_prompt
 
     response = await MODEL.ainvoke(messages)
-    return response.content
+    # Multiple retrieved chunks can land on the same filename:page (e.g. a
+    # long page split across chunks) — join them so the frontend has the
+    # full source text to match against, not just one fragment.
+    flat_citations = {k: " ... ".join(v) for k, v in citation_chunks.items()}
+    return json.dumps({"answer": response.content, "citations": flat_citations})

@@ -30,6 +30,8 @@ class ChatService {
       this._notify('error', { sessionId: msg.session_id, data: msg.data });
     } else if (msg.type === "status") {
       this._notify("status", {sessionId: msg.session_id,data: msg.data,});
+    }else if (msg.type === 'citation_chunks') {
+      this._notify('citation_chunks', { sessionId: msg.session_id, data: msg.data });
     }
   }
 

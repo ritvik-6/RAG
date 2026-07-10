@@ -644,6 +644,12 @@ hr.divider {
   color: #a1a1aa;
 }
 
+.pdf-highlight-match {
+  background-color: rgba(255, 209, 0, 0.45) !important;
+  border-radius: 2px;
+  transition: background-color 0.2s ease;
+}
+
 .pdf-viewer-content {
   flex: 1;
   width: 100%;
