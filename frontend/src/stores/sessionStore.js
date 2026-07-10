@@ -10,18 +10,32 @@ export const useSessionStore = create((set, get) => ({
   isStreaming: false,
 
   streamingSessionId: null,
-  streamingText: '',
+  streamingText: "",
+  streamingStatus: "Thinking...",
 
   startStream: (sessionId) =>
-    set({ streamingSessionId: sessionId, streamingText: '', isStreaming: true }),
+    set({
+      streamingSessionId: sessionId,
+      streamingText: '',
+      streamingStatus: 'Understanding your question...',
+      isStreaming: true,
+    }),
 
   appendStreamToken: (sessionId, token) => {
     if (sessionId !== get().streamingSessionId) return;
     set((state) => ({ streamingText: state.streamingText + token }));
   },
 
+  setStreamingStatus: (status) =>
+    set({ streamingStatus: status }),
+
   endStream: () =>
-    set({ streamingSessionId: null, streamingText: '', isStreaming: false }),
+    set({
+      streamingSessionId: null,
+      streamingText: '',
+      streamingStatus: 'Thinking...',
+      isStreaming: false,
+    }),
 
   getActiveSessionId: () => get().activeSessionId,
 

@@ -11,6 +11,11 @@ from backend.config import PromptContainer, worker_prompt_var
 
 router = APIRouter()
 
+TOOL_STATUS_MESSAGES = {
+    "rag_sub_agent": "Reading through your documents",
+    "catalog_sub_agent": "Checking your uploaded files",
+}
+
 @router.websocket("/ws/chat")
 async def websocket_chat(websocket: WebSocket):
     await websocket.accept()
@@ -106,6 +111,12 @@ async def websocket_chat(websocket: WebSocket):
                 "thread_id": str(thread_id),
                 "session_id": session_id
             }))
+
+            await websocket.send_text(json.dumps({
+                "type": "status",
+                "data": "Understanding your question",
+                "session_id": session_id,
+            }))
             full_response = ""
             active_tool = None
             tool_called = False
@@ -117,8 +128,26 @@ async def websocket_chat(websocket: WebSocket):
                 if event_name == "on_tool_start":
                     active_tool = event.get("name")
                     tool_called = True
+
+                    status_msg = TOOL_STATUS_MESSAGES.get(
+                        active_tool,
+                        "Working on it"
+                    )
+
+                    await websocket.send_text(json.dumps({
+                        "type": "status",
+                        "data": status_msg,
+                        "session_id": session_id,
+                    }))
                 elif event_name == "on_tool_end":
                     active_tool = None
+
+                    await websocket.send_text(json.dumps({
+                        "type": "status",
+                        "data": "Putting together a response",
+                        "session_id": session_id,
+                    }))
+                    await asyncio.sleep(0.7)
                     output = event.get("data", {}).get("output")
                     # Tool output may be a ToolMessage object or a plain string
                     tool_text = getattr(output, "content", output)
@@ -133,6 +162,12 @@ async def websocket_chat(websocket: WebSocket):
 
             if not tool_called:
                 print("WARNING: Supervisor did not call any tool. Falling back to rag_sub_agent.")
+
+                await websocket.send_text(json.dumps({
+                    "type": "status",
+                    "data": "Searching your documents",
+                    "session_id": session_id,
+                }))
 
                 full_response = await run_rag_sub_agent(
                     query=message,

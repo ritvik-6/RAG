@@ -7,12 +7,16 @@ export function ChatStreamListener() {
   const finalizeAiMessage = useSessionStore((s) => s.finalizeAiMessage);
   const finalizeErrorMessage = useSessionStore((s) => s.finalizeErrorMessage);
   const endStream = useSessionStore((s) => s.endStream);
+  const setStreamingStatus = useSessionStore((s) => s.setStreamingStatus);
 
   useEffect(() => {
     const unsubscribe = chatService.subscribe((event, payload) => {
       if (event === 'token') {
         appendStreamToken(payload.sessionId, payload.data);
-      } else if (event === 'end') {
+      } else if (event === 'status') {
+        setStreamingStatus(payload.data);
+      }
+      else if (event === 'end') {
         const { streamingSessionId, streamingText } = useSessionStore.getState();
         if (payload.sessionId === streamingSessionId) {
           finalizeAiMessage(payload.sessionId, streamingText, payload.latencyMs);
@@ -28,7 +32,7 @@ export function ChatStreamListener() {
       }
     });
     return unsubscribe;
-  }, [appendStreamToken, finalizeAiMessage, finalizeErrorMessage, endStream]);
+  }, [appendStreamToken, finalizeAiMessage, finalizeErrorMessage, endStream, setStreamingStatus]);
 
   return null;
 }
