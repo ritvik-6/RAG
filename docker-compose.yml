@@ -70,7 +70,8 @@ services:
       - MILVUS_URI=http://milvus:19530
     volumes:
       - ./backend:/app/backend
-    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+      - hf_cache:/root/.cache/huggingface
+    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload --no-access-log
     depends_on:
       - milvus
       - db
@@ -99,4 +100,6 @@ volumes:
   miniodata:
     driver: local
   milvusdata:
+    driver: local
+  hf_cache:
     driver: local

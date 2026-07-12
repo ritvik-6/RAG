@@ -17,6 +17,7 @@ dependencies = [
     "langchain-text-splitters>=1.1.2",
     "langgraph>=1.2.4",
     "pymilvus>=2.6.15",
+    "pymupdf>=1.28.0",
     "pypdf>=6.13.2",
     "python-dotenv>=1.2.2",
     "python-multipart>=0.0.32",

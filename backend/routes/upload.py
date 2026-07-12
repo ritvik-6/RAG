@@ -3,10 +3,11 @@ import shutil
 import asyncio
 import uuid
 import json
+import time
+import fitz
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks
-from langchain_community.document_loaders import PyPDFLoader
+from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-
 from backend.config import EMBEDDINGS, UPLOAD_DIR, USE_SHARED_COLLECTION
 from backend.database import get_db
 from backend.vector_store import get_milvus
@@ -40,9 +41,18 @@ async def process_pdf_upload_task(document_id: str, file_path: str, filename: st
 
     try:
         # 1. Parsing Phase
+        t0 = time.time()
         await update_status("parsing")
-        loader = PyPDFLoader(file_path)
-        docs = await asyncio.to_thread(loader.load)
+        def _parse_pdf(path: str):
+            doc = fitz.open(path)
+            pages = [
+                Document(page_content=page.get_text(), metadata={"page": i})
+                for i, page in enumerate(doc)
+            ]
+            doc.close()
+            return pages
+
+        docs = await asyncio.to_thread(_parse_pdf, file_path)
 
         if not docs or not isinstance(docs, list):
             raise ValueError("Failed to parse PDF. File may be corrupt.")
@@ -52,12 +62,14 @@ async def process_pdf_upload_task(document_id: str, file_path: str, filename: st
 
         if not extracted_text or len(extracted_text) < 50:
             raise ValueError("PDF contains insufficient text content.")
-
+        print(f"[TIMING] parse: {time.time()-t0:.1f}s, pages={len(docs)}")
         # 2. Text Splitting
+        t1=time.time()
         splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
         splits = await asyncio.to_thread(splitter.split_documents, docs)
-
+        print(f"[TIMING] split: {time.time()-t1:.1f}s, chunks={len(splits)}")
         # 3. Embedding Generation (batched in size 256)
+        t2 = time.time()
         await update_status("embedding")
         batch_size = 256
         vectors = []
@@ -65,8 +77,9 @@ async def process_pdf_upload_task(document_id: str, file_path: str, filename: st
             batch = [s.page_content for s in splits[i:i + batch_size]]
             batch_vectors = await asyncio.to_thread(EMBEDDINGS.embed_documents, batch)
             vectors.extend(batch_vectors)
-
+        print(f"[TIMING] embed: {time.time()-t2:.1f}s")
         # 4. Vector DB Indexing
+        t3 = time.time()
         await update_status("indexing")
 
         if USE_SHARED_COLLECTION:
@@ -113,7 +126,7 @@ async def process_pdf_upload_task(document_id: str, file_path: str, filename: st
             data.append(item)
 
         await asyncio.to_thread(client.insert, collection_name=collection_name, data=data)
-
+        print(f"[TIMING] index+insert: {time.time()-t3:.1f}s")
         # 5. Mark Complete
         file_size = os.path.getsize(file_path)
         async with pool.acquire() as conn:
