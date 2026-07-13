@@ -12,7 +12,7 @@ export function DocumentItem({ filename, onDelete }) {
         onClick={onDelete}
         title="Delete document"
       >
-        <Trash2 size={18} />
+        <Trash2 size={14} />
       </button>
     </div>
   );

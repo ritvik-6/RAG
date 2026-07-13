@@ -19,10 +19,10 @@ export function MessageList() {
   const streamingText = useSessionStore((s) => s.streamingText);
   const streamingStatus = useSessionStore((s) => s.streamingStatus);
 
-  const handleCitationClick = (filename, page, key, snippet) => {
+  const handleCitationClick = (filename, page, key, snippet, answerSentence, quote) => {
     const isActive = activeCitationKey === key;
     setActiveCitationKey(isActive ? null : key);
-    togglePdf(filename, page, snippet);
+    togglePdf(filename, page, snippet, answerSentence, quote);
   };
 
   // Blank landing state 
@@ -60,7 +60,7 @@ export function MessageList() {
               <CitationList
                 citations={citations}
                 activeCitationKey={activeCitationKey}
-                onCitationClick={(filename, page, key, snippet) => handleCitationClick(filename, page, key, snippet)}
+                onCitationClick={(filename, page, key, snippet, answerSentence, quote) => handleCitationClick(filename, page, key, snippet, answerSentence, quote)}
               />
             )}
           </Fragment>

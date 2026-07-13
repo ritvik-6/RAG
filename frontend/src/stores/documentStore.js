@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { apiService } from '../services/apiService';
+import { useToastStore } from './toastStore';
 
 export const useDocumentStore = create((set) => ({
   documents: [],
@@ -30,10 +31,10 @@ export const useDocumentStore = create((set) => ({
         const res = await apiService.uploadPdf(form);
         if (!res.ok) {
           const err = await res.json();
-          alert(`Error uploading ${file.name}: ${err.detail}`);
+          useToastStore.getState().addToast(`Error uploading ${file.name}: ${err.detail}`, 'error');
         }
       } catch {
-        alert(`Network error uploading ${file.name}.`);
+        useToastStore.getState().addToast(`Network error uploading ${file.name}.`, 'error');
       }
     }
 

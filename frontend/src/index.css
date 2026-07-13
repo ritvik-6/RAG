@@ -5,18 +5,18 @@
 @tailwind utilities;
 
 :root {
-  --bg-canvas: #f8fafc;        /* Soft zinc/slate off-white backdrop */
-  --bg-sidebar: #fafafa;       /* Warmer off-white sidebar background */
+  --bg-canvas: #f8fafc;        
+  --bg-sidebar: #fafafa;       
   --surface: #ffffff;
-  --brand: #424141;            /* Indigo-600 premium action accent */
-  --brand-dark: #646467;       /* Indigo-700 active accent */
-  --brand-light:#e8e8ea; /* Soft transparent focus halo */
-  --text-dark: #09090b;        /* Zinc-950 deep primary text */
-  --text-muted: #71717a;       /* Zinc-500 secondary/meta text */
-  --border: #e4e4e7;           /* Zinc-200 structural borders */
-  --border-muted: #f4f4f5;     /* Zinc-100 component border lines */
-  --bubble-user: #eeeeee;      /* Dark Zinc message bubble background */
-  --bubble-ai: #ffffff;        /* White AI message bubble background */
+  --brand: #424141;            
+  --brand-dark: #646467;       
+  --brand-light:#e8e8ea; 
+  --text-dark: #09090b;        
+  --text-muted: #71717a;       
+  --border: #e4e4e7;          
+  --border-muted: #f4f4f5;     
+  --bubble-user: #eeeeee;      
+  --bubble-ai: #ffffff;      
   --danger: #ef4444;
   --danger-bg: #fee2e2;
   --radius-lg: 12px;
@@ -26,6 +26,10 @@
   --pdf-panel-transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+::selection {
+  background-color: #49a0e8; 
+  color: #ffffff;            
+}
 html,
 body,
 #root {
@@ -82,11 +86,11 @@ body {
     background: var(--brand);
     color: white;
     border: none;
-    padding: 8px 16px;
+    padding: 6px 12px;
     border-radius: var(--radius-sm);
     cursor: pointer;
     font-weight: 500;
-    font-size: 13px;
+    font-size: 11.5px;
     white-space: nowrap;
     transition: background 0.15s ease, transform 0.1s ease;
   }
@@ -119,10 +123,64 @@ body {
   }
 }
 
+/* ── Icon Rail ───────────────────────────────────────────────────────────── */
+.icon-rail {
+  width: 44px;
+  min-width: 44px;
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 0;
+  flex-shrink: 0;
+  z-index: 50;
+}
+
+.icon-rail-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  padding: 0;
+}
+
+.icon-rail-btn:hover {
+  background: var(--border-muted);
+  color: var(--text-dark);
+}
+
+.icon-rail-btn.active {
+  background: var(--brand-light);
+  color: var(--brand);
+}
+
+.icon-rail-btn.active:hover {
+  background: var(--brand-light);
+  color: var(--brand);
+}
+
+.icon-rail-avatar {
+  transition: transform 0.15s ease;
+}
+
+.icon-rail-avatar:hover {
+  transform: scale(1.05);
+}
+
 /* ── Sidebar ──────────────────────────────────────────────────────────────── */
 #sidebar {
-  width: 280px;
-  min-width: 280px;
+  width: 247px;
+  min-width: 247px;
+  flex-shrink: 0;
   background: var(--bg-sidebar);
   border-right: 1px solid var(--border);
   padding: 20px 16px;
@@ -175,6 +233,9 @@ body {
   font-size: 15px;
   font-weight: 600;
   color: var(--text-dark);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 #sidebar h3 {
@@ -183,12 +244,20 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+  flex: 1;
+  min-width: 0;
 }
 
 .sidebar-subtitle {
   font-size: 12px;
   color: var(--text-muted);
   margin-top: -6px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 .upload-control-panel {
@@ -214,8 +283,8 @@ body {
 
 .upload-control-panel button {
   width: 100%;
-  padding: 6px;
-  font-size: 12px;
+  padding: 5px;
+  font-size: 11px;
   border-radius: var(--radius-sm);
 }
 
@@ -224,6 +293,20 @@ body {
   color: var(--text-muted);
   font-weight: 500;
   min-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.status-txt span {
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+  flex: 1;
+  min-width: 0;
 }
 .status-indicator {
   display: inline-flex;
@@ -326,8 +409,8 @@ hr.divider {
 }
 
 .new-chat-btn {
-  padding: 4px 8px;
-  font-size: 11px;
+  padding: 3px 6px;
+  font-size: 10px;
   border-radius: var(--radius-sm);
 }
 
@@ -342,7 +425,7 @@ hr.divider {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 3px 9px;
+  padding: 4px 6px;
   border-radius: var(--radius-sm);
   background: transparent;
   border: none;
@@ -373,9 +456,9 @@ hr.divider {
   background: transparent;
   color: var(--text-muted);
   border: none;
-  padding: 2px 6px;
+  padding: 1px 4px;
   border-radius: var(--radius-sm);
-  font-size: 12px;
+  font-size: 10.5px;
   font-weight: 400;
   cursor: pointer;
   flex-shrink: 0;
@@ -481,12 +564,12 @@ hr.divider {
 .citation-item {
   display: flex;
   align-items: center;
-  gap: 5px;
-  padding: 4px 10px 4px 8px;
+  gap: 4px;
+  padding: 3px 8px 3px 6px;
   background: #eff6ff;
   border: 1px solid #bfdbfe;
   border-radius: 20px;
-  font-size: 12px;
+  font-size: 11px;
   cursor: pointer;
   color: var(--brand);
   font-weight: 500;
@@ -622,8 +705,8 @@ hr.divider {
 }
 
 #submitBtn {
-  width: 36px;
-  height: 36px;
+  width: 30px;
+  height: 30px;
   padding: 0;
   border-radius: 50%;
   background: var(--brand);
@@ -729,15 +812,28 @@ hr.divider {
 /* ── Inline Session Rename Styles ── */
 .edit-session-input {
   width: 100%;
-  background: transparent;
-  border: none;
+  height: 22px;
+  box-sizing: border-box;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
   outline: none;
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 12px;
+  font-weight: 400;
   font-family: inherit;
-  color: inherit;
-  padding: 0;
+  color: var(--text-dark);
+  padding: 2px 6px;
   margin: 0;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.edit-session-input:focus {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 1px var(--brand-light);
+}
+
+.session-item:has(.edit-session-input) {
+  padding: 2px 3px;
 }
 
 .session-actions {
@@ -758,13 +854,13 @@ hr.divider {
   background: transparent;
   color: var(--text-muted);
   border: none;
-  padding: 4px;
+  padding: 3px;
   border-radius: var(--radius-sm);
-  font-size: 14px;
+  font-size: 12px;
   cursor: pointer;
   line-height: 1;
   opacity: 0;
-  transition: opacity 0.15s ease, color 0.15s, background 0.15s;
+  transition: opacity 0.15s ease, color 0.15, background 0.15s;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -800,15 +896,15 @@ hr.divider {
   color: var(--text-dark);
   border: none;
   border-radius: var(--radius-sm);
-  padding: 6px 10px;
-  font-size: 12px;
+  padding: 4px 8px;
+  font-size: 11px;
   font-weight: 500;
   text-align: left;
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   width: 100%;
 }
 
@@ -913,4 +1009,183 @@ hr.divider {
 .landing-content p {
   font-size: 14px;
   line-height: 1.5;
+}
+
+/* ── Confirm Modal Styles ── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(9, 9, 11, 0.4);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.2s ease-out forwards;
+}
+
+.modal-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  width: 100%;
+  max-width: 360px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  transform: scale(0.95);
+  opacity: 0;
+  animation: scaleIn 0.2s ease-out forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.modal-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-dark);
+  margin-bottom: 8px;
+}
+
+.modal-message {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin-bottom: 20px;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.modal-btn-cancel {
+  background: var(--surface);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+}
+
+.modal-btn-cancel:hover {
+  background: var(--border-muted);
+  color: var(--text-dark);
+}
+
+.modal-btn-confirm-destructive {
+  background: var(--danger);
+  color: white;
+}
+
+.modal-btn-confirm-destructive:hover {
+  background: #dc2626;
+}
+
+.modal-btn-confirm-primary {
+  background: var(--brand);
+  color: white;
+}
+
+.modal-btn-confirm-primary:hover {
+  background: var(--brand-dark);
+}
+
+/* ── Toast Container & Toast Styles ── */
+.toast-container {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 1100;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.toast-item {
+  pointer-events: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 4px 12px rgba(9, 9, 11, 0.08);
+  min-width: 260px;
+  max-width: 380px;
+  animation: slideInRight 0.25s ease-out forwards;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.toast-success {
+  border-left: 4px solid #10b981;
+}
+
+.toast-success-icon {
+  color: #10b981;
+}
+
+.toast-error {
+  border-left: 4px solid var(--danger);
+}
+
+.toast-error-icon {
+  color: var(--danger);
+}
+
+.toast-info {
+  border-left: 4px solid var(--brand);
+}
+
+.toast-info-icon {
+  color: var(--brand);
+}
+
+.toast-text {
+  font-size: 13px;
+  color: var(--text-dark);
+  font-weight: 500;
+  flex: 1;
+  word-break: break-word;
+}
+
+.toast-close-btn {
+  background: transparent;
+  color: var(--text-muted);
+  border: none;
+  padding: 2px;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.12s ease;
+}
+
+.toast-close-btn:hover {
+  color: var(--text-dark);
+  background: var(--border-muted);
 }

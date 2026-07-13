@@ -15,7 +15,7 @@ export function CitationItem({ index, filename, page, isActive, onClick }) {
         <span className="citation-page">· p.{page}</span>
       </span>
       <span className="citation-icon flex items-center justify-center">
-        <FileText size={18} />
+        <FileText size={14} />
       </span>
     </button>
   );

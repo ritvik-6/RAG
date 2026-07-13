@@ -5,6 +5,7 @@ import { useUiStore } from '../../stores/uiStore';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { getUserId } from '../../lib/userId';
 import { SendHorizontal } from 'lucide-react';
+import { useToastStore } from '../../stores/toastStore';
 
 export function QueryInput() {
   const [text, setText] = useState('');
@@ -22,7 +23,7 @@ export function QueryInput() {
     if (!trimmed) return;
 
     if (!isReady) {
-      alert('Connection not ready. Please wait a moment.');
+      useToastStore.getState().addToast('Connection not ready. Please wait a moment.', 'error');
       return;
     }
 
@@ -65,7 +66,7 @@ export function QueryInput() {
         className="flex items-center justify-center"
         title="Send query"
       >
-        <SendHorizontal size={18} />
+        <SendHorizontal size={14} />
       </button>
     </div>
   );

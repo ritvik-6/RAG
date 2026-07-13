@@ -5,6 +5,7 @@ export const useUiStore = create((set) => ({
   runtimeStatus: 'System standby.',
   inputEnabled: false,
   activeCitationKey: null,
+  activeSidebarTab: 'sessions',
 
   toggleSidebar: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
 
@@ -13,4 +14,6 @@ export const useUiStore = create((set) => ({
   setInputEnabled: (inputEnabled) => set({ inputEnabled }),
 
   setActiveCitationKey: (activeCitationKey) => set({ activeCitationKey }),
+
+  setActiveSidebarTab: (activeSidebarTab) => set({ activeSidebarTab }),
 }));

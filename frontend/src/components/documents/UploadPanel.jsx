@@ -3,6 +3,7 @@ import { useDocumentStore } from '../../stores/documentStore';
 import { useUiStore } from '../../stores/uiStore';
 import { apiService } from '../../services/apiService';
 import { UploadCloud, Loader2 } from 'lucide-react';
+import { useToastStore } from '../../stores/toastStore';
 
 export function UploadPanel({ userId }) {
   const fileInputRef = useRef(null);
@@ -16,7 +17,7 @@ export function UploadPanel({ userId }) {
 
     const files = Array.from(selector.files);
     if (files.length === 0) {
-      alert('Please select at least one PDF file.');
+      useToastStore.getState().addToast('Please select at least one PDF file.', 'error');
       return;
     }
 
@@ -77,7 +78,7 @@ export function UploadPanel({ userId }) {
       setInputEnabled(true);
       setRuntimeStatus('✅ Documents ready. Ask anything.');
     } catch (err) {
-      alert(err.message || 'Error during file upload.');
+      useToastStore.getState().addToast(err.message || 'Error during file upload.', 'error');
       setRuntimeStatus('❌ Upload failed.');
     } finally {
       setUploading(false);
@@ -96,9 +97,9 @@ export function UploadPanel({ userId }) {
         className="flex items-center justify-center gap-2"
       >
         {uploading ? (
-          <Loader2 size={18} className="animate-spin shrink-0" />
+          <Loader2 size={14} className="animate-spin shrink-0" />
         ) : (
-          <UploadCloud size={18} className="shrink-0" />
+          <UploadCloud size={14} className="shrink-0" />
         )}
         Upload Documents
       </button>

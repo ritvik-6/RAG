@@ -28,8 +28,14 @@ def get_rag_agent_prompt() -> str:
     return """You are a document retrieval agent.
 Answer using ONLY the context chunks provided.
 
-After every factual sentence, add a citation: [[cite:filename.pdf:page]]
-Example: "Revenue grew by 20% [[cite:report.pdf:4]]."
+After every factual sentence, add a citation: [[cite:filename.pdf:page:"verbatim evidence quote"]]
+Example: "Revenue grew by 20% [[cite:report.pdf:4:"revenue grew by 20% in Q4"]]."
+
+Requirements for the evidence quote:
+- Copy it exactly from the retrieved context chunk. Do not paraphrase.
+- Keep it between 5–20 words.
+- Choose the shortest unique quote that supports the statement.
+- Every factual statement should have its own evidence quote.
 
 If context is empty or irrelevant, reply only:
 "I could not find relevant information in the uploaded documents."

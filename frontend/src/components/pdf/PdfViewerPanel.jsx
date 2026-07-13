@@ -27,7 +27,9 @@ export function PdfViewerPanel() {
   const close = usePdfStore((s) => s.close);
   const filename = usePdfStore((s) => s.filename);
   const storePage = usePdfStore((s) => s.page);
-  const snippet = usePdfStore((s) => s.snippet);
+  const quote = usePdfStore((s) => s.quote);
+  const answerSentence = usePdfStore((s) => s.answerSentence);
+  const fallbackText = usePdfStore((s) => s.fallbackText);
 
   // Panel resize states
   const [width, setWidth] = useState(DEFAULT_WIDTH);
@@ -191,35 +193,27 @@ export function PdfViewerPanel() {
   // MutationObserver-driven citation highlighter
   useEffect(() => {
     let observer;
-
     const highlightText = () => {
       const prevHighlights = document.querySelectorAll('.pdf-highlight-match');
       prevHighlights.forEach((el) => {
         el.classList.remove('pdf-highlight-match');
       });
+      if (!quote && !answerSentence && !fallbackText) return;
 
-      if (!snippet) return;
+      // Guard: only highlight if the panel is actually showing the citation's target page.
+      // Prevents re-matching stray tokens when the user manually navigates to a different page.
+      if (typeof storePage === 'number' && currentPage !== storePage) return;
 
       const textLayer = containerRef.current?.querySelector('.textLayer, .react-pdf__Page__textContent');
       if (!textLayer) return;
-
       const spans = Array.from(textLayer.querySelectorAll('span'));
       if (spans.length === 0) return;
-
-      const cleanSnippet = snippet.replace(/\s+/g, ' ').trim().toLowerCase();
-      if (!cleanSnippet) return;
-
-      const snippetWords = cleanSnippet.split(' ').filter(Boolean);
-      if (snippetWords.length === 0) return;
-
       const spanInfo = spans.map((span) => ({
         span,
         text: span.textContent.replace(/\s+/g, ' ').trim().toLowerCase(),
       }));
-
       let combinedText = '';
       const spanRanges = [];
-      
       spanInfo.forEach((info) => {
         const startIdx = combinedText.length;
         combinedText += info.text + ' ';
@@ -227,52 +221,132 @@ export function PdfViewerPanel() {
         spanRanges.push({ startIdx, endIdx, span: info.span });
       });
 
-      // Try exact match first
-      const idx = combinedText.indexOf(cleanSnippet);
-      if (idx !== -1) {
-        const matchStart = idx;
-        const matchEnd = idx + cleanSnippet.length;
-        let firstMatchSpan = null;
+      // Normalization helper for verbatim quote matching
+      const normalizeText = (text) => {
+        let result = '';
+        for (let i = 0; i < text.length; i++) {
+          const char = text[i].toLowerCase();
+          if (/[\p{L}\p{N}]/u.test(char)) {
+            result += char;
+          }
+        }
+        return result;
+      };
 
+      let normalizedText = '';
+      const charIndexToSpan = [];
+      spans.forEach((span) => {
+        const text = span.textContent;
+        for (let i = 0; i < text.length; i++) {
+          const char = text[i].toLowerCase();
+          if (/[\p{L}\p{N}]/u.test(char)) {
+            normalizedText += char;
+            charIndexToSpan.push(span);
+          }
+        }
+      });
+
+      const highlightPhrase = (phrase, startIdx) => {
+        const matchStart = startIdx;
+        const matchEnd = startIdx + phrase.length;
+        let firstMatchSpan = null;
         spanRanges.forEach((range) => {
           if (range.startIdx < matchEnd && range.endIdx > matchStart) {
             range.span.classList.add('pdf-highlight-match');
             if (!firstMatchSpan) firstMatchSpan = range.span;
           }
         });
-
         if (firstMatchSpan) {
           firstMatchSpan.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
-        return;
-      }
+      };
 
-      // Fuzzy phrase match fallback (using 4-word sliding window)
-      const phraseLen = Math.min(4, snippetWords.length);
-      let firstMatchSpan = null;
-
-      for (let start = 0; start <= snippetWords.length - phraseLen; start++) {
-        const phrase = snippetWords.slice(start, start + phraseLen).join(' ');
-        const pIdx = combinedText.indexOf(phrase);
-        if (pIdx !== -1) {
-          const matchStart = pIdx;
-          const matchEnd = pIdx + phrase.length;
-          spanRanges.forEach((range) => {
-            if (range.startIdx < matchEnd && range.endIdx > matchStart) {
-              range.span.classList.add('pdf-highlight-match');
-              if (!firstMatchSpan) firstMatchSpan = range.span;
+      const runFuzzyMatch = (textToMatch) => {
+        const cleanText = textToMatch.replace(/\s+/g, ' ').trim().toLowerCase();
+        if (!cleanText) return false;
+        const words = cleanText.split(' ').filter(Boolean);
+        if (words.length === 0) return false;
+        const maxLen = Math.min(6, words.length);
+        const minLen = Math.min(4, words.length);
+        for (let len = maxLen; len >= minLen; len--) {
+          const matches = [];
+          for (let start = 0; start <= words.length - len; start++) {
+            const phrase = words.slice(start, start + len).join(' ');
+            let count = 0;
+            let pos = combinedText.indexOf(phrase);
+            const firstPos = pos;
+            while (pos !== -1) {
+              count++;
+              pos = combinedText.indexOf(phrase, pos + 1);
             }
-          });
+            if (count > 0) matches.push({ phrase, index: firstPos, count });
+          }
+          const uniqueMatch = matches.find(m => m.count === 1);
+          if (uniqueMatch) {
+            highlightPhrase(uniqueMatch.phrase, uniqueMatch.index);
+            return true;
+          }
+          if (matches.length > 0) {
+            highlightPhrase(matches[0].phrase, matches[0].index);
+            return true;
+          }
+        }
+        return false;
+      };
+
+      // 1. Exact match for verbatim quote
+      if (quote) {
+        const cleanQuote = normalizeText(quote);
+        if (cleanQuote) {
+          const quoteIdx = normalizedText.indexOf(cleanQuote);
+          if (quoteIdx !== -1) {
+            const matchedSpans = new Set();
+            for (let k = quoteIdx; k < quoteIdx + cleanQuote.length; k++) {
+              matchedSpans.add(charIndexToSpan[k]);
+            }
+            let firstMatchSpan = null;
+            matchedSpans.forEach((span) => {
+              span.classList.add('pdf-highlight-match');
+              if (!firstMatchSpan) firstMatchSpan = span;
+            });
+            if (firstMatchSpan) {
+              firstMatchSpan.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+            return;
+          }
         }
       }
 
-      if (firstMatchSpan) {
-        firstMatchSpan.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // 2. Legacy answerSentence matching (exact then fuzzy phrase matches)
+      if (answerSentence) {
+        const cleanAnswer = answerSentence.replace(/[*_`]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+        const answerIdx = combinedText.indexOf(cleanAnswer);
+        if (answerIdx !== -1) {
+          highlightPhrase(cleanAnswer, answerIdx);
+          return;
+        }
+
+        const answerWords = cleanAnswer.split(' ').filter(Boolean);
+        const hasWordOverlap = answerWords.some(word => combinedText.includes(word));
+        if (hasWordOverlap) {
+          if (runFuzzyMatch(cleanAnswer)) {
+            return;
+          }
+        }
+      }
+
+      // 3. Fallback matching for fallbackText (exact then fuzzy phrase matches)
+      if (fallbackText) {
+        const cleanFallback = fallbackText.replace(/\s+/g, ' ').trim().toLowerCase();
+        const fallbackIdx = combinedText.indexOf(cleanFallback);
+        if (fallbackIdx !== -1) {
+          highlightPhrase(cleanFallback, fallbackIdx);
+          return;
+        }
+        runFuzzyMatch(fallbackText);
       }
     };
-
     highlightText();
-
     const targetNode = containerRef.current;
     if (targetNode) {
       observer = new MutationObserver(() => {
@@ -280,13 +354,10 @@ export function PdfViewerPanel() {
       });
       observer.observe(targetNode, { childList: true, subtree: true });
     }
-
     return () => {
-      if (observer) {
-        observer.disconnect();
-      }
+      if (observer) observer.disconnect();
     };
-  }, [snippet, currentPage, loading]);
+  }, [quote, answerSentence, fallbackText, currentPage, loading, storePage]);
 
   const baseWidth = containerWidth > 32 ? containerWidth - 32 : 280;
 

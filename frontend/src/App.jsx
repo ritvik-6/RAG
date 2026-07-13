@@ -6,13 +6,14 @@ import { useSessionStore } from './stores/sessionStore';
 import { useDocumentStore } from './stores/documentStore';
 import { useUiStore } from './stores/uiStore';
 import { Sidebar } from './components/layout/Sidebar';
-import { SidebarToggle } from './components/layout/SidebarToggle';
+import { IconRail } from './components/layout/IconRail';
 import { ChatCanvas } from './components/layout/ChatCanvas';
 import { PdfViewerPanel } from './components/pdf/PdfViewerPanel';
 import { ErrorBoundary } from './components/error/ErrorBoundary';
 import { useWebSocket } from './hooks/useWebSocket';
 import { chatService } from './services/chatService';
 import { ChatStreamListener } from './components/chat/ChatStreamListener';
+import { ToastContainer } from './components/common/ToastContainer';
 
 function MainLayout() {
   useWebSocket();
@@ -117,6 +118,8 @@ function MainLayout() {
   return (
     <div className="flex h-screen overflow-hidden w-full">
       <ChatStreamListener />
+      <ToastContainer />
+      <IconRail />
       <Sidebar userId={userId} />
       <ChatCanvas />
       <ErrorBoundary name="PDF Viewer">

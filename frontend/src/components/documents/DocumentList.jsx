@@ -1,6 +1,9 @@
+import { useState } from 'react';
 import { useDocumentStore } from '../../stores/documentStore';
 import { useUiStore } from '../../stores/uiStore';
 import { DocumentItem } from './DocumentItem';
+import { ConfirmModal } from '../common/ConfirmModal';
+import { useToastStore } from '../../stores/toastStore';
 
 export function DocumentList({ userId }) {
   const documents = useDocumentStore((s) => s.documents);
@@ -8,20 +11,23 @@ export function DocumentList({ userId }) {
   const setInputEnabled = useUiStore((s) => s.setInputEnabled);
   const setRuntimeStatus = useUiStore((s) => s.setRuntimeStatus);
 
-  const handleDelete = async (documentId) => {
-    if (!confirm('Permanently delete this document from all storage layers?')) return;
+  const [deleteDocId, setDeleteDocId] = useState(null);
+  const addToast = useToastStore((s) => s.addToast);
 
+  const handleDeleteConfirm = async () => {
+    if (!deleteDocId) return;
     try {
-      const remaining = await executeDocumentPurge(documentId, userId);
-      console.log("Remaining documents:", remaining);
-      console.log("Remaining count:", remaining.length);
+      const remaining = await executeDocumentPurge(deleteDocId, userId);
       if (remaining.length === 0) {
-        console.log("Last document deleted");
         setInputEnabled(false);
         setRuntimeStatus("Upload a PDF to get started.");
       }
+      addToast("Document deleted successfully", "success");
     } catch (err) {
-      alert(err.message === 'Failed to delete document.' ? 'Failed to delete document.' : 'Connection error during document deletion.');
+      const msg = err.message === 'Failed to delete document.' ? 'Failed to delete document.' : 'Connection error during document deletion.';
+      addToast(msg, "error");
+    } finally {
+      setDeleteDocId(null);
     }
   };
 
@@ -31,6 +37,15 @@ export function DocumentList({ userId }) {
 
   return (
     <>
+      <ConfirmModal
+        isOpen={deleteDocId !== null}
+        title="Delete document?"
+        message="Permanently delete this document from all storage layers? This cannot be undone."
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setDeleteDocId(null)}
+        confirmLabel="Delete"
+        destructive={true}
+      />
       {documents.map((doc) => (
         <DocumentItem
           key={doc.document_id}
@@ -38,7 +53,7 @@ export function DocumentList({ userId }) {
           uploadTime={doc.upload_time}
           onDelete={(e) => {
             e?.stopPropagation?.();
-            handleDelete(doc.document_id);
+            setDeleteDocId(doc.document_id);
           }}
         />
       ))}

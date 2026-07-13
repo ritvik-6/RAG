@@ -7,21 +7,23 @@ export const usePdfStore = create((set, get) => ({
   currentKey: null,
   filename: null,
   page: null,
-  snippet: null,
+  quote: null,
+  answerSentence: null,
+  fallbackText: null,
   iframeSrc: '',
   title: 'Document Viewer',
 
-  toggle: (filename, page, snippet) => {
+  toggle: (filename, page, snippet, answerSentence, quote) => {
     const key = `${filename}:${page}`;
     const { isOpen, currentKey } = get();
     if (isOpen && currentKey === key) {
       get().close();
       return;
     }
-    get().open(filename, page, key, snippet);
+    get().open(filename, page, key, snippet, answerSentence, quote);
   },
 
-  open: (filename, page, key, snippet) => {
+  open: (filename, page, key, snippet, answerSentence, quote) => {
     const userId = getUserId() || '';
     const diskFilename = `${userId}_${filename}`;
     const url = apiService.getFileUrl(diskFilename, page);
@@ -31,7 +33,9 @@ export const usePdfStore = create((set, get) => ({
       currentKey: key || `${filename}:${page}`,
       filename,
       page,
-      snippet: snippet || null,
+      quote: quote || null,
+      answerSentence: answerSentence || null,
+      fallbackText: snippet || null,
       iframeSrc: url,
       title: `${filename} — Page ${page}`,
     });
@@ -43,7 +47,9 @@ export const usePdfStore = create((set, get) => ({
       currentKey: null,
       filename: null,
       page: null,
-      snippet: null,
+      quote: null,
+      answerSentence: null,
+      fallbackText: null,
       iframeSrc: '',
       title: 'Document Viewer',
     });

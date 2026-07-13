@@ -86,14 +86,35 @@ export function parseCitations(rawText, citationChunks = {}) {
   const citations = [];
   const seen = new Map();
 
-  const cleanText = rawText.replace(/\[\[cite:([^:\]]+):(\d+)\]\]/g, (_match, filename, page) => {    const key = `${filename}:${page}`;
+  const cleanText = rawText.replace(/\[\[cite:([^:\]]+):(\d+)(?::"([^"]*)")?\]\]/g, (match, filename, page, quote, offset) => {
+    const key = `${filename}:${page}`;
     let index;
+
+    // Capture preceding sentence
+    const leftText = rawText.slice(0, offset);
+    let boundaryIdx = -1;
+    for (let i = leftText.length - 1; i >= 0; i--) {
+      const char = leftText[i];
+      if (char === '.' || char === '?' || char === '!') {
+        boundaryIdx = i;
+        break;
+      }
+    }
+    let sentence = leftText.slice(boundaryIdx + 1);
+    sentence = sentence.replace(/\[\[cite:[^\]]+\]\]/g, '').replace(/[*_`]/g, '').replace(/\s+/g, ' ').trim();
 
     if (seen.has(key)) {
       index = seen.get(key);
     } else {
       index = citations.length + 1;
-      citations.push({ index, filename, page: parseInt(page, 10), snippet: citationChunks[key] || null });
+      citations.push({
+        index,
+        filename,
+        page: parseInt(page, 10),
+        snippet: citationChunks[key] || null,
+        answerSentence: sentence || null,
+        quote: quote || null
+      });
       seen.set(key, index);
     }
     return `<sup class="citation-ref" data-index="${index}">[${index}]</sup>`;

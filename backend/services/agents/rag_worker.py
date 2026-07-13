@@ -110,7 +110,7 @@ async def run_rag_sub_agent(
                 f"This question contains the following sub-questions — answer EVERY one "
                 f"of them, even if their supporting evidence comes from different pages "
                 f"or sources:\n{sub_q_list}\n\n"
-                f"Remember: cite every factual claim using [[cite:filename:page]] "
+                f"Remember: cite every factual claim using [[cite:filename:page:\"verbatim evidence quote\"]] "
                 f"exactly as shown in the source labels above."
             )
         }

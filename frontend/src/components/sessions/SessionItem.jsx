@@ -91,7 +91,7 @@ export function SessionItem({ sessionName, isActive, onSelect, onDelete, onRenam
               }}
               title="Session actions"
             >
-              <MoreHorizontal size={18} />
+              <MoreHorizontal size={14} />
             </button>
             {isMenuOpen && (
               <div className="session-dropdown-menu">
@@ -103,7 +103,7 @@ export function SessionItem({ sessionName, isActive, onSelect, onDelete, onRenam
                     setIsMenuOpen(false);
                   }}
                 >
-                  <Pencil size={18} /> Rename
+                  <Pencil size={14} /> Rename
                 </button>
                 <button
                   type="button"
@@ -114,7 +114,7 @@ export function SessionItem({ sessionName, isActive, onSelect, onDelete, onRenam
                     setIsMenuOpen(false);
                   }}
                 >
-                  <Trash2 size={18} /> Delete
+                  <Trash2 size={14} /> Delete
                 </button>
               </div>
             )}
