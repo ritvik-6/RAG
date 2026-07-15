@@ -7,7 +7,7 @@ from backend.services.agents.rag_worker import run_rag_sub_agent
 from backend.services.agents.catalog_worker import run_catalog_sub_agent
 
 
-def create_orchestrator_agent(user_id: str, collection_name: str):
+def create_orchestrator_agent(user_id: str, collection_name: str,history: list[dict] = None):
     """Compiles the parent supervisor engine with decoupled sub-agent tools."""
 
     @tool(return_direct=True)
@@ -16,7 +16,7 @@ def create_orchestrator_agent(user_id: str, collection_name: str):
         numbers, or subject matter discussed INSIDE the user's uploaded documents.
         This is the default tool — use it whenever unsure."""
         print(f"[ROUTING] user={user_id} tool=rag_sub_agent query={query!r}")
-        return await run_rag_sub_agent(query, collection_name, user_id)
+        return await run_rag_sub_agent(query, collection_name, user_id, history=history)
 
     @tool(return_direct=True)
     async def catalog_sub_agent(query: str) -> str:

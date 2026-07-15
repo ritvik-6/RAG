@@ -89,9 +89,20 @@ async def websocket_chat(websocket: WebSocket):
                         session_id, user_id, new_name, thread_id
                     )
 
+                HISTORY_LIMIT = 6  # last 3 user+assistant exchanges
+
                 rows = await conn.fetch(
-                    "SELECT sender, message_text FROM chat_messages WHERE session_id = $1 ORDER BY created_at ASC",
-                    session_id
+                    """
+                    SELECT sender, message_text FROM (
+                        SELECT sender, message_text, created_at
+                        FROM chat_messages
+                        WHERE session_id = $1
+                        ORDER BY created_at DESC
+                        LIMIT $2
+                    ) recent
+                    ORDER BY created_at ASC
+                    """,
+                    session_id, HISTORY_LIMIT
                 )
                 await conn.execute(
                     "INSERT INTO chat_messages (session_id, sender, message_text) VALUES ($1, $2, $3)",
@@ -104,7 +115,7 @@ async def websocket_chat(websocket: WebSocket):
             ]
 
             # Instantiating modern hierarchical supervisor agent
-            agent = create_orchestrator_agent(user_id, collection_name)
+            agent = create_orchestrator_agent(user_id, collection_name, history=formatted_history)
             
             await websocket.send_text(json.dumps({
                 "type": "start",
