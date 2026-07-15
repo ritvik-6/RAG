@@ -12,6 +12,13 @@ COPY . /app
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev --python 3.14
 
+# --- New standalone dev stage ---
+FROM ghcr.io/astral-sh/uv:python3.14-bookworm AS dev
+ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
+ENV PYTHONUNBUFFERED=1
+WORKDIR /app
+CMD ["sh", "-c", "uv sync --no-dev && exec uv run uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload --no-access-log"]
+
 FROM python:3.14-slim AS backend_runtime
 
 WORKDIR /app

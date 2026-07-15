@@ -1,18 +1,24 @@
 import asyncio
 import json
 import re
-from backend.config import EMBEDDINGS, MODEL, ROUTER_MODEL, USE_SHARED_COLLECTION
+from backend.config import EMBEDDINGS, MODEL, ROUTER_MODEL, USE_SHARED_COLLECTION, RERANKER
 from backend.vector_store import get_milvus
 from backend.prompts import get_rag_agent_prompt, get_query_decomposition_prompt
 from backend.config import worker_prompt_var
+from rank_bm25 import BM25Okapi
 
 
 # ── NEW: history-aware query rewrite ────────────────────────────────────
 
-REWRITE_PROMPT = """Given this recent conversation and a follow-up question, rewrite the
-follow-up as a standalone question containing all necessary context from the conversation.
-If the follow-up is already standalone and doesn't rely on the conversation, return it
-unchanged. Output ONLY the rewritten question. No preamble, no explanation, no markdown.
+REWRITE_PROMPT = """Given this recent conversation and a follow-up question, determine if the
+follow-up is a continuation of the SAME topic as the conversation, or a NEW, unrelated topic.
+
+- If it's a continuation (uses pronouns, refers to "it"/"that", or is clearly building on the
+  previous topic), rewrite it as a standalone question containing the necessary context.
+- If it's a NEW topic unrelated to the conversation, return the follow-up EXACTLY as written,
+  unchanged. Do NOT force unrelated context onto it.
+
+Output ONLY the resulting question. No preamble, no explanation, no markdown.
 
 Conversation:
 {history_text}
@@ -34,14 +40,16 @@ def _needs_rewrite(query: str) -> bool:
 
 
 async def _rewrite_query(query: str, history: list[dict]) -> str:
-    """Best-effort rewrite. Falls back to the original query on any failure
-    so a bad rewrite can never break retrieval outright."""
     history_text = "\n".join(f"{h['role']}: {h['content']}" for h in history)
     try:
         rewrite_res = await ROUTER_MODEL.ainvoke([
             {"role": "system", "content": REWRITE_PROMPT.format(history_text=history_text, query=query)}
         ])
         rewritten = rewrite_res.content.strip()
+        # Defensive: strip label the model sometimes echoes back
+        for prefix in ("Standalone question:", "Rewritten question:", "Standalone:"):
+            if rewritten.lower().startswith(prefix.lower()):
+                rewritten = rewritten[len(prefix):].strip()
         print(f"[REWRITE] {query!r} -> {rewritten!r}")
         return rewritten
     except Exception as e:
@@ -66,19 +74,83 @@ async def decompose_query(query: str) -> list[str]:
     return [query]
 
 
-async def _search_one(client, target_collection, filter_expr, sub_query: str):
-    """Dense search for a single sub-question."""
+async def _build_bm25_index(client, target_collection, filter_expr):
+    """Fetch the filtered corpus once and build a BM25 index. Called once per turn."""
+    def _run():
+        results = client.query(
+            collection_name=target_collection,
+            filter=filter_expr if filter_expr else "",
+            output_fields=["text", "source", "page_number"],
+        )
+        if not results:
+            return None, []
+        tokenized_corpus = [r["text"].lower().split() for r in results]
+        bm25 = BM25Okapi(tokenized_corpus)
+        return bm25, results
+
+    return await asyncio.to_thread(_run)
+
+
+def _bm25_score(bm25, corpus, sub_query: str, top_k: int = 15):
+    """Score a single sub-question against an already-built index. Cheap, no I/O.
+    Returns NEW dicts — never mutates the shared corpus list, since multiple
+    sub-questions score against it concurrently."""
+    if bm25 is None or not corpus:
+        return []
+    scores = bm25.get_scores(sub_query.lower().split())
+    scored = [{**r, "bm25_score": float(s)} for r, s in zip(corpus, scores)]
+    return sorted(scored, key=lambda r: r["bm25_score"], reverse=True)[:top_k]
+
+
+def _reciprocal_rank_fusion(dense_results: list[dict], bm25_results: list[dict], k: int = 60) -> list[dict]:
+    """Fuses two ranked lists using RRF. Keys chunks by (source, page_number, text)
+    since Milvus dense results don't carry a stable 'id' field in your current schema."""
+    def _key(r):
+        return (r.get("source"), r.get("page_number"), r.get("text", "")[:100])
+
+    scores = {}
+    chunk_map = {}
+
+    for rank, r in enumerate(dense_results):
+        key = _key(r)
+        scores[key] = scores.get(key, 0) + 1 / (k + rank + 1)
+        chunk_map[key] = r
+
+    for rank, r in enumerate(bm25_results):
+        key = _key(r)
+        scores[key] = scores.get(key, 0) + 1 / (k + rank + 1)
+        chunk_map[key] = r
+
+    return sorted(chunk_map.values(), key=lambda r: scores[_key(r)], reverse=True)
+
+async def _search_one(client, target_collection, filter_expr, sub_query: str, bm25, bm25_corpus):
+    """Hybrid search for a single sub-question: dense + BM25 (index reused), fused via RRF."""
     query_vector = await asyncio.to_thread(EMBEDDINGS.embed_query, sub_query)
-    results = await asyncio.to_thread(
+    dense_results_raw = await asyncio.to_thread(
         client.search,
         collection_name=target_collection,
         data=[query_vector],
-        limit=5,
+        limit=15,
         filter=filter_expr,
         output_fields=["text", "source", "page_number"]
     )
-    return results[0] if results and results[0] else []
+    dense_hits = dense_results_raw[0] if dense_results_raw and dense_results_raw[0] else []
+    dense_flat = [hit["entity"] for hit in dense_hits]
 
+    bm25_flat = await asyncio.to_thread(_bm25_score, bm25, bm25_corpus, sub_query)
+
+    fused = _reciprocal_rank_fusion(dense_flat, bm25_flat)
+    return [{"entity": r} for r in fused[:15]]
+
+def _rerank(query: str, chunks: list[dict], top_k: int = 5) -> list[dict]:
+    """chunks: list of {"text", "source", "page_number"}"""
+    if not chunks:
+        return chunks
+    pairs = [(query, c["text"]) for c in chunks]
+    scores = RERANKER.predict(pairs)
+    for c, s in zip(chunks, scores):
+        c["rerank_score"] = float(s)
+    return sorted(chunks, key=lambda c: c["rerank_score"], reverse=True)[:top_k]
 
 # ── MODIFIED: new `history` param + rewrite step added at the top ───────
 
@@ -115,18 +187,20 @@ async def run_rag_sub_agent(
         return "I could not find relevant information about this in the uploaded document."
 
     # 1. Decompose the (possibly rewritten) query into sub-questions
-    sub_questions = await decompose_query(working_query)   
+    sub_questions = await decompose_query(working_query)
+
+    # 1b. Build BM25 index ONCE for this turn, reused across all sub-questions
+    bm25_index, bm25_corpus = await _build_bm25_index(client, target_collection, filter_expr)
 
     # 2. Retrieve independently for each sub-question, in parallel
     all_hits = await asyncio.gather(*[
-        _search_one(client, target_collection, filter_expr, sq)
+        _search_one(client, target_collection, filter_expr, sq, bm25_index, bm25_corpus)
         for sq in sub_questions
     ])
 
     # 3. Merge + dedupe chunks across all sub-question retrievals
     seen_texts = set()
-    context_parts = []
-    citation_chunks = {}
+    deduped_chunks = []
     for hits in all_hits:
         for hit in hits:
             entity = hit["entity"]
@@ -134,17 +208,27 @@ async def run_rag_sub_agent(
             if not text or text in seen_texts:
                 continue
             seen_texts.add(text)
-            source = entity.get("source", "unknown.pdf")
-            page = entity.get("page_number", 1)
-            context_parts.append(f"[Source: {source} | Page: {page}]\n{text}")
-            key = f"{source}:{page}"
-            citation_chunks.setdefault(key, []).append(text)
+            deduped_chunks.append({
+                "text": text,
+                "source": entity.get("source", "unknown.pdf"),
+                "page_number": entity.get("page_number", 1),
+            })
 
-    if not context_parts:
+    if not deduped_chunks:
         return json.dumps({
             "answer": "I could not find relevant information about this in the uploaded document.",
             "citations": {}
         })
+
+    # 3b. Rerank against the (possibly rewritten) query, keep top 5
+    top_chunks = await asyncio.to_thread(_rerank, working_query, deduped_chunks, 5)
+    print(f"[RERANK] {len(deduped_chunks)} candidates -> top {len(top_chunks)}, scores: {[round(c['rerank_score'], 2) for c in top_chunks]}")
+    context_parts = []
+    citation_chunks = {}
+    for c in top_chunks:
+        context_parts.append(f"[Source: {c['source']} | Page: {c['page_number']}]\n{c['text']}")
+        key = f"{c['source']}:{c['page_number']}"
+        citation_chunks.setdefault(key, []).append(c["text"])
 
     context_str = "\n\n---\n\n".join(context_parts)
     sub_q_list = "\n".join(f"- {sq}" for sq in sub_questions)

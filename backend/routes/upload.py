@@ -72,11 +72,16 @@ async def process_pdf_upload_task(document_id: str, file_path: str, filename: st
         t2 = time.time()
         await update_status("embedding")
         batch_size = 256
-        vectors = []
-        for i in range(0, len(splits), batch_size):
-            batch = [s.page_content for s in splits[i:i + batch_size]]
-            batch_vectors = await asyncio.to_thread(EMBEDDINGS.embed_documents, batch)
-            vectors.extend(batch_vectors)
+        batches = [
+            [s.page_content for s in splits[i:i + batch_size]]
+            for i in range(0, len(splits), batch_size)
+        ]
+
+        async def embed_batch(batch: list[str]):
+            return await asyncio.to_thread(EMBEDDINGS.embed_documents, batch)
+
+        batch_results = await asyncio.gather(*[embed_batch(b) for b in batches])
+        vectors = [v for result in batch_results for v in result]
         print(f"[TIMING] embed: {time.time()-t2:.1f}s")
         # 4. Vector DB Indexing
         t3 = time.time()

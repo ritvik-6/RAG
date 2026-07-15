@@ -3,6 +3,8 @@ import contextvars
 from dotenv import load_dotenv
 from langchain_groq import ChatGroq
 from langchain_huggingface import HuggingFaceEmbeddings
+from sentence_transformers import CrossEncoder
+
 
 load_dotenv()
 
@@ -14,6 +16,7 @@ class PromptContainer:
 # ContextVar to capture the PromptContainer instance
 worker_prompt_var = contextvars.ContextVar("worker_prompt", default=None)
 
+RERANKER = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:

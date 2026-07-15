@@ -206,6 +206,7 @@ async def websocket_chat(websocket: WebSocket):
                     query=message,
                     collection_name=collection_name,
                     user_id=user_id,
+                    history=formatted_history,
                 )
 
                 citation_chunks = {}

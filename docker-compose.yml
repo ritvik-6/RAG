@@ -58,7 +58,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      target: backend_runtime
+      target: dev
     container_name: fastapi-backend
     restart: always
     ports:
@@ -70,8 +70,12 @@ services:
       - MILVUS_URI=http://milvus:19530
     volumes:
       - ./backend:/app/backend
+      - documents_data:/app/backend/documents
+      - ./pyproject.toml:/app/pyproject.toml
+      - ./uv.lock:/app/uv.lock
+      - venv_data:/app/.venv         
+      - uv_cache:/root/.cache/uv      
       - hf_cache:/root/.cache/huggingface
-    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload --no-access-log
     depends_on:
       - milvus
       - db
@@ -102,4 +106,10 @@ volumes:
   milvusdata:
     driver: local
   hf_cache:
+    driver: local
+  venv_data:
+    driver: local
+  uv_cache:
+    driver: local
+  documents_data:        
     driver: local
