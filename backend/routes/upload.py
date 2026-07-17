@@ -11,6 +11,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from backend.config import EMBEDDINGS, UPLOAD_DIR, USE_SHARED_COLLECTION
 from backend.database import get_db
 from backend.vector_store import get_milvus
+from backend.services.agents.rag_worker import _bm25_cache
 
 router = APIRouter()
 
@@ -150,6 +151,9 @@ async def process_pdf_upload_task(document_id: str, file_path: str, filename: st
                 }),
                 document_id
             )
+        # Invalidate stale BM25 caches now that new vectors exist
+        _bm25_cache.pop((user_id, document_id), None)
+        _bm25_cache.pop((user_id, None), None)
 
     except Exception as e:
         error_msg = str(e)

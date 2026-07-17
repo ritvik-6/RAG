@@ -5,6 +5,7 @@ from fastapi.responses import FileResponse
 from backend.database import get_db
 from backend.vector_store import get_milvus
 from backend.config import UPLOAD_DIR, USE_SHARED_COLLECTION
+from backend.services.agents.rag_worker import _bm25_cache
 
 router = APIRouter()
 
@@ -100,6 +101,9 @@ async def delete_document(document_id: str):
 
         # 3. Drop relational ledger record out of PostgreSQL
         await conn.execute("DELETE FROM documents WHERE document_id = $1", document_id)
+        # Invalidate stale BM25 caches for this document
+        _bm25_cache.pop((user_id, document_id), None)
+        _bm25_cache.pop((user_id, None), None)
 
     file_path = os.path.join(UPLOAD_DIR, f"{user_id}_{filename}")
     if os.path.exists(file_path):
