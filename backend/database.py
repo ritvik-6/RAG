@@ -25,6 +25,14 @@ async def init_db():
                 ADD COLUMN IF NOT EXISTS citation_chunks JSONB DEFAULT '{}'::jsonb;
             """)
             await conn.execute("""
+                ALTER TABLE chat_messages 
+                ADD COLUMN IF NOT EXISTS thinking_steps JSONB;
+            """)
+            await conn.execute("""
+                ALTER TABLE chat_messages 
+                ADD COLUMN IF NOT EXISTS thinking_duration_ms INTEGER;
+            """)
+            await conn.execute("""
                 CREATE TABLE IF NOT EXISTS thread_messages (
                     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                     thread_id UUID NOT NULL,

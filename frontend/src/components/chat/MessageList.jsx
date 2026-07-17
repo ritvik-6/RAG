@@ -17,7 +17,9 @@ export function MessageList() {
   const togglePdf = usePdfStore((s) => s.toggle);
   const streamingSessionId = useSessionStore((s) => s.streamingSessionId);
   const streamingText = useSessionStore((s) => s.streamingText);
-  const streamingStatus = useSessionStore((s) => s.streamingStatus);
+  const streamingSteps = useSessionStore((s) => s.streamingSteps);
+  const stepsComplete = useSessionStore((s) => s.stepsComplete);
+  const thinkingDurationMs = useSessionStore((s) => s.thinkingDurationMs);
 
   const handleCitationClick = (filename, page, key, snippet, answerSentence, quote) => {
     const isActive = activeCitationKey === key;
@@ -55,6 +57,8 @@ export function MessageList() {
               citationChunks={msg.citationChunks}
               createdAt={msg.created_at}
               latencyMs={msg.latency_ms}
+              steps={msg.steps}
+              thinkingDurationMs={msg.thinkingDurationMs}
             />
             {msg.classType === 'ai-align' && citations.length > 0 && (
               <CitationList
@@ -66,10 +70,14 @@ export function MessageList() {
           </Fragment>
         );
       })}
-      {streamingSessionId === activeSessionId && <StreamingBubble
-    text={streamingText}
-    status={streamingStatus}
-/>}
+      {streamingSessionId === activeSessionId && (
+        <StreamingBubble
+          text={streamingText}
+          steps={streamingSteps}
+          stepsComplete={stepsComplete}
+          thinkingDurationMs={thinkingDurationMs}
+        />
+      )}
     </div>
   );
 }

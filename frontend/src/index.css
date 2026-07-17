@@ -493,7 +493,7 @@ hr.divider {
 }
 
 .chat-bubble {
-  max-width: 70%;
+  max-width: 85%;
   padding: 10px 14px;
   border-radius: 12px;
   font-size: 14px;
@@ -1188,4 +1188,9 @@ hr.divider {
 .toast-close-btn:hover {
   color: var(--text-dark);
   background: var(--border-muted);
+}
+
+/* Thinking Trace CSS custom overrides */
+.chat-bubble.ai-align .thinking-trace-container {
+  margin-bottom: 8px;
 }

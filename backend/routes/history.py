@@ -17,7 +17,8 @@ async def get_user_sessions(user_id: str):
         rows = await conn.fetch(
             """
             SELECT s.session_id, s.session_name, s.thread_id,
-                   m.sender, m.message_text, m.created_at, m.citation_chunks, t.latency_ms
+                   m.sender, m.message_text, m.created_at, m.citation_chunks, t.latency_ms,
+                   m.thinking_steps, m.thinking_duration_ms
             FROM chat_sessions s
             LEFT JOIN chat_messages m ON s.session_id = m.session_id
             LEFT JOIN thread_messages t ON m.message_id = t.message_id
@@ -61,12 +62,25 @@ async def get_user_sessions(user_id: str):
                 elif isinstance(cit_raw, dict):
                     cit_dict = cit_raw
 
+            steps_raw = r["thinking_steps"]
+            steps_list = []
+            if steps_raw:
+                if isinstance(steps_raw, str):
+                    try:
+                        steps_list = json.loads(steps_raw)
+                    except Exception:
+                        pass
+                elif isinstance(steps_raw, list):
+                    steps_list = steps_raw
+
             result[sid].append({
                 "sender": r["sender"],
                 "text": r["message_text"],
                 "created_at": r["created_at"].isoformat() if r["created_at"] else None,
                 "latency_ms": r["latency_ms"],
-                "citation_chunks": cit_dict
+                "citation_chunks": cit_dict,
+                "thinking_steps": steps_list,
+                "thinking_duration_ms": r["thinking_duration_ms"]
             })
 
     return {

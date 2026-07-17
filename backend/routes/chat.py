@@ -7,7 +7,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from backend.database import get_db
 from backend.services.agents.orchestrator import create_orchestrator_agent
 from backend.services.agents.rag_worker import run_rag_sub_agent
-from backend.config import PromptContainer, worker_prompt_var
+from backend.config import PromptContainer, worker_prompt_var, status_emitter_var
 
 router = APIRouter()
 
@@ -123,11 +123,19 @@ async def websocket_chat(websocket: WebSocket):
                 "session_id": session_id
             }))
 
-            await websocket.send_text(json.dumps({
-                "type": "status",
-                "data": "Understanding your question",
-                "session_id": session_id,
-            }))
+            status_steps = []
+            thinking_duration_ms = None
+
+            async def send_status(status_text: str):
+                status_steps.append(status_text)
+                await websocket.send_text(json.dumps({
+                    "type": "status",
+                    "data": status_text,
+                    "session_id": session_id,
+                }))
+
+            status_emitter_var.set(send_status)
+            await send_status("Understanding your question")
             full_response = ""
             citation_chunks = {}
             active_tool = None
@@ -146,20 +154,12 @@ async def websocket_chat(websocket: WebSocket):
                         "Working on it"
                     )
 
-                    await websocket.send_text(json.dumps({
-                        "type": "status",
-                        "data": status_msg,
-                        "session_id": session_id,
-                    }))
+                    await send_status(status_msg)
                 elif event_name == "on_tool_end":
                     ended_tool_name = event.get("name")
                     active_tool = None
 
-                    await websocket.send_text(json.dumps({
-                        "type": "status",
-                        "data": "Putting together a response",
-                        "session_id": session_id,
-                    }))
+                    await send_status("Putting together a response")
                     await asyncio.sleep(0.7)
                     output = event.get("data", {}).get("output")
                     # Tool output may be a ToolMessage object or a plain string
@@ -190,17 +190,15 @@ async def websocket_chat(websocket: WebSocket):
                         words = answer_text.split(" ")
                         for i, word in enumerate(words):
                             piece = word if i == 0 else " " + word
+                            if thinking_duration_ms is None:
+                                thinking_duration_ms = round((time.perf_counter() - start_time) * 1000)
                             await websocket.send_text(json.dumps({"type": "token", "data": piece,"session_id": session_id}))
                             await asyncio.sleep(0.02)
 
             if not tool_called:
                 print("WARNING: Supervisor did not call any tool. Falling back to rag_sub_agent.")
 
-                await websocket.send_text(json.dumps({
-                    "type": "status",
-                    "data": "Searching your documents",
-                    "session_id": session_id,
-                }))
+                await send_status("Searching your documents")
 
                 full_response = await run_rag_sub_agent(
                     query=message,
@@ -228,6 +226,8 @@ async def websocket_chat(websocket: WebSocket):
                 words = full_response.split(" ")
                 for i, word in enumerate(words):
                     piece = word if i == 0 else " " + word
+                    if thinking_duration_ms is None:
+                        thinking_duration_ms = round((time.perf_counter() - start_time) * 1000)
                     await websocket.send_text(
                         json.dumps({
                             "type": "token",
@@ -253,11 +253,11 @@ async def websocket_chat(websocket: WebSocket):
                 # Capture the message_id using RETURNING
                 row = await conn.fetchrow(
                     """
-                    INSERT INTO chat_messages (session_id, sender, message_text, citation_chunks) 
-                    VALUES ($1, $2, $3, $4) 
+                    INSERT INTO chat_messages (session_id, sender, message_text, citation_chunks, thinking_steps, thinking_duration_ms) 
+                    VALUES ($1, $2, $3, $4, $5, $6) 
                     RETURNING message_id
                     """,
-                    session_id, "ai", full_response, json.dumps(citation_chunks)
+                    session_id, "ai", full_response, json.dumps(citation_chunks), json.dumps(status_steps), thinking_duration_ms
                 )
                 ai_message_id = row["message_id"] if row else None
                 

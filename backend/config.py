@@ -15,6 +15,7 @@ class PromptContainer:
 
 # ContextVar to capture the PromptContainer instance
 worker_prompt_var = contextvars.ContextVar("worker_prompt", default=None)
+status_emitter_var = contextvars.ContextVar("status_emitter", default=None)
 
 RERANKER = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
 

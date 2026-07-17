@@ -11,14 +11,20 @@ export const useSessionStore = create((set, get) => ({
 
   streamingSessionId: null,
   streamingText: "",
-  streamingStatus: "Thinking...",
+  streamingSteps: [],
+  stepsComplete: false,
+  thinkingStartedAt: null,
+  thinkingDurationMs: null,
   pendingCitationChunks: {},
 
   startStream: (sessionId) =>
     set({
       streamingSessionId: sessionId,
       streamingText: '',
-      streamingStatus: 'Understanding your question...',
+      streamingSteps: [],
+      stepsComplete: false,
+      thinkingStartedAt: Date.now(),
+      thinkingDurationMs: null,
       isStreaming: true,
       pendingCitationChunks: {},
     }),
@@ -26,17 +32,35 @@ export const useSessionStore = create((set, get) => ({
 
   appendStreamToken: (sessionId, token) => {
     if (sessionId !== get().streamingSessionId) return;
-    set((state) => ({ streamingText: state.streamingText + token }));
+    set((state) => {
+      const isFirstToken = state.streamingText === '';
+      const updates = {
+        streamingText: state.streamingText + token
+      };
+      if (isFirstToken && state.thinkingStartedAt) {
+        updates.stepsComplete = true;
+        updates.thinkingDurationMs = Date.now() - state.thinkingStartedAt;
+      }
+      return updates;
+    });
   },
 
-  setStreamingStatus: (status) =>
-    set({ streamingStatus: status }),
+  appendStreamingStep: (status) =>
+    set((state) => ({
+      streamingSteps: [
+        ...state.streamingSteps,
+        { id: crypto.randomUUID(), text: status }
+      ]
+    })),
 
   endStream: () =>
     set({
       streamingSessionId: null,
       streamingText: '',
-      streamingStatus: 'Thinking...',
+      streamingSteps: [],
+      stepsComplete: false,
+      thinkingStartedAt: null,
+      thinkingDurationMs: null,
       isStreaming: false,
     }),
 
@@ -55,6 +79,8 @@ export const useSessionStore = create((set, get) => ({
 
   finalizeAiMessage: (sessionId, rawText, latencyMs) => {
     const citationChunks = get().pendingCitationChunks;
+    const steps = get().streamingSteps;
+    const thinkingDurationMs = get().thinkingDurationMs;
     set((state) => ({
       chatSessionsMemory: {
         ...state.chatSessionsMemory,
@@ -66,6 +92,8 @@ export const useSessionStore = create((set, get) => ({
             latency_ms: latencyMs,
             created_at: new Date().toISOString(),
             citationChunks,
+            steps,
+            thinkingDurationMs,
           }
         ],
       },
@@ -112,13 +140,21 @@ export const useSessionStore = create((set, get) => ({
         const sessionMetadata = {};
 
         Object.entries(sessions).forEach(([sid, messages], index) => {
-          chatSessionsMemory[sid] = messages.map((m) => ({
-            text: m.text,
-            classType: m.sender === 'user' ? 'user-align' : 'ai-align',
-            created_at: m.created_at,
-            latency_ms: m.latency_ms,
-            citationChunks: m.citation_chunks || {},
-          }));
+          chatSessionsMemory[sid] = messages.map((m) => {
+            const steps = (m.thinking_steps || []).map((stepText, idx) => ({
+              id: `hist-step-${idx}-${Math.random().toString(36).substring(2, 9)}`,
+              text: stepText
+            }));
+            return {
+              text: m.text,
+              classType: m.sender === 'user' ? 'user-align' : 'ai-align',
+              created_at: m.created_at,
+              latency_ms: m.latency_ms,
+              citationChunks: m.citation_chunks || {},
+              steps,
+              thinkingDurationMs: m.thinking_duration_ms,
+            };
+          });
 
           sessionMetadata[sid] = {
             session_name: meta[sid]?.session_name || `Chat Session ${index + 1}`,
