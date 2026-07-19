@@ -35,6 +35,9 @@ RETRIEVAL_REWRITE_PROMPT = """
 You are a retrieval query reformulation assistant for a Retrieval-Augmented Generation (RAG) system.
 
 Your ONLY job is to improve retrieval from the user's uploaded document.
+- If a document excerpt is provided below, prefer wording/names/terminology that
+  actually appears in that excerpt over the user's original phrasing, as long as
+  it doesn't change their intent.
 
 Rules:
 - Preserve the user's original intent.
@@ -64,10 +67,15 @@ def _needs_rewrite(query: str) -> bool:
     return bool(_FOLLOWUP_SIGNAL.search(query))
 
 
-async def _rewrite_for_retrieval(query: str) -> str:
+async def _rewrite_for_retrieval(query: str, sample_chunk_text: str = "") -> str:
+    grounding = (
+            f"\n\nHere is an actual excerpt from the target document, for vocabulary "
+            f"and phrasing reference only — do not answer from it, just use it to "
+            f"understand how this document refers to people/things:\n{sample_chunk_text[:500]}"
+            if sample_chunk_text else "")    
     try:
         res = await ROUTER_MODEL.ainvoke([
-            {"role": "system", "content": RETRIEVAL_REWRITE_PROMPT},
+            {"role": "system", "content": RETRIEVAL_REWRITE_PROMPT + grounding},
             {"role": "user", "content": query},
         ])
         rewritten = res.content.strip()
@@ -402,7 +410,8 @@ async def run_rag_sub_agent(
     if history and _needs_rewrite(query):
         retry_query = await _rewrite_from_history(query, history)
     else:
-        retry_query = await _rewrite_for_retrieval(query)
+        sample_text = top_chunks[0]["text"] if top_chunks else ""
+        retry_query = await _rewrite_for_retrieval(query, sample_text)
 
     if retry_query == query:
         # Rewrite produced nothing new — retrying would just repeat the same search.

@@ -70,7 +70,6 @@ services:
       - MILVUS_URI=http://milvus:19530
     volumes:
       - ./backend:/app/backend
-      - documents_data:/app/backend/documents
       - ./pyproject.toml:/app/pyproject.toml
       - ./uv.lock:/app/uv.lock
       - venv_data:/app/.venv         
@@ -110,6 +109,4 @@ volumes:
   venv_data:
     driver: local
   uv_cache:
-    driver: local
-  documents_data:        
     driver: local

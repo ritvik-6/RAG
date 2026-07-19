@@ -12,6 +12,20 @@ from backend.services.status_messages import pick_status
 
 router = APIRouter()
 
+def extract_text_from_content(content):
+    if isinstance(content, str):
+        return content
+    elif isinstance(content, list):
+        parts = []
+        for block in content:
+            if isinstance(block, str):
+                parts.append(block)
+            elif isinstance(block, dict):
+                if block.get("type") == "text" and "text" in block:
+                    parts.append(block["text"])
+        return "".join(parts)
+    return ""
+
 TOOL_STATUS_MESSAGES = {
     "rag_sub_agent": "Reading through your documents",
     "catalog_sub_agent": "Checking your uploaded files",
@@ -23,6 +37,7 @@ async def websocket_chat(websocket: WebSocket):
     pool = get_db()
     
     last_status_message = None
+    session_id = None
     
     send_lock = asyncio.Lock()
     async def safe_send(data: str):
@@ -185,6 +200,7 @@ async def websocket_chat(websocket: WebSocket):
             await send_status_stage("routing_start")
             full_response = ""
             citation_chunks = {}
+            direct_answer_chunks = []
             active_tool = None
             tool_called = False
 
@@ -212,6 +228,14 @@ async def websocket_chat(websocket: WebSocket):
                             "data": status_msg,
                             "session_id": session_id,
                         }))
+                elif event_name == "on_chat_model_stream":
+                    if active_tool is None and not tool_called:
+                        chunk = event.get("data", {}).get("chunk")
+                        raw_content = getattr(chunk, "content", None)
+                        if raw_content:
+                            text = extract_text_from_content(raw_content)
+                            if text:
+                                direct_answer_chunks.append(text)
                 elif event_name == "on_tool_end":
                     ended_tool_name = event.get("name")
                     active_tool = None
@@ -253,45 +277,15 @@ async def websocket_chat(websocket: WebSocket):
                             await asyncio.sleep(0.02)
 
             if not tool_called:
-                print("WARNING: Supervisor did not call any tool. Falling back to rag_sub_agent.")
-
-                await send_status_stage("rag_tool_start")
-
-                full_response = await run_rag_sub_agent(
-                    query=message,
-                    collection_name=collection_name,
-                    user_id=user_id,
-                    history=formatted_history,
-                )
-
+                full_response = "".join(direct_answer_chunks).strip()
                 citation_chunks = {}
-                try:
-                    parsed = json.loads(full_response)
-                    full_response = parsed.get("answer", full_response)
-                    citation_chunks = parsed.get("citations", {})
-                except json.JSONDecodeError:
-                    pass
 
-                if citation_chunks:
-                    await safe_send(json.dumps({
-                        "type": "citation_chunks",
-                        "data": citation_chunks,
-                        "session_id": session_id,
-                    }))
-
-                # Stream the fallback response
                 words = full_response.split(" ")
                 for i, word in enumerate(words):
                     piece = word if i == 0 else " " + word
                     if thinking_duration_ms is None:
                         thinking_duration_ms = round((time.perf_counter() - start_time) * 1000)
-                    await safe_send(
-                        json.dumps({
-                            "type": "token",
-                            "data": piece,
-                            "session_id": session_id,
-                        })
-                    )
+                    await safe_send(json.dumps({"type": "token", "data": piece, "session_id": session_id}))
                     await asyncio.sleep(0.02)
 
             # Stop timing immediately after the final token message is sent
@@ -334,4 +328,13 @@ async def websocket_chat(websocket: WebSocket):
     except WebSocketDisconnect:
         print("WebSocket tracking session closed down smoothly.")
     except Exception as runtime_fault:
-        print(f"Orchestration Error: {str(runtime_fault)}")
+        error_msg = f"Orchestration Error: {str(runtime_fault)}"
+        print(error_msg)
+        try:
+            await safe_send(json.dumps({
+                "type": "error",
+                "data": error_msg,
+                "session_id": session_id
+            }))
+        except Exception as send_err:
+            print(f"Failed to send error message over websocket: {send_err}")
