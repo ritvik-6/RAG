@@ -361,7 +361,7 @@ body {
 .docs-container {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   margin-top: 8px;
 }
 
@@ -369,26 +369,67 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 3px 6px;
-  background: transparent;
-  border: none;
-  border-radius: var(--radius-sm);
-  gap: 6px;
-  transition: background 0.15s ease;
+  padding: 8px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  gap: 10px;
+  transition: background 0.15s ease, border-color 0.15s ease;
   cursor: pointer;
 }
 
 .doc-item:hover {
   background: var(--border-muted);
+  border-color: #d4d4d8;
+}
+
+.doc-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.doc-icon-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  background: #fee2e2;
+  flex-shrink: 0;
+}
+
+.doc-icon-badge svg {
+  color: #ef4444;
 }
 
 .doc-name {
   font-size: 12px;
+  font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   flex: 1;
   color: var(--text-dark);
+  text-align: left;
+}
+
+.delete-doc-btn {
+  background: transparent;
+  color: var(--text-muted);
+  border: none;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.delete-doc-btn:hover {
+  background: var(--danger-bg);
+  color: var(--danger);
 }
 
 .docs-empty {
@@ -919,28 +960,6 @@ hr.divider {
   color: var(--danger);
 }
 
-/* ── Document Item Styles ── */
-.doc-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  flex: 1;
-  min-width: 0;
-}
-
-.doc-name {
-  font-weight: 600;
-  font-size: 13px;
-  color: var(--text-dark);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.doc-time {
-  font-size: 10px;
-  color: var(--text-muted);
-}
 
 /* ── Message Bubble Metadata Styles ── */
 .chat-bubble-container {
