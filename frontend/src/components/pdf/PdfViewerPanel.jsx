@@ -500,7 +500,7 @@ export function PdfViewerPanel() {
                 <Page
                   pageNumber={currentPage}
                   width={baseWidth}
-                  scale={1.75}
+                  scale={1.1}
                   onLoadSuccess={onPageLoadSuccess}
                   renderAnnotationLayer={false}
                   renderTextLayer={true}

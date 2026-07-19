@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useDocumentStore } from '../../stores/documentStore';
 import { useUiStore } from '../../stores/uiStore';
+import { usePdfStore } from '../../stores/pdfStore';
 import { DocumentItem } from './DocumentItem';
 import { ConfirmModal } from '../common/ConfirmModal';
 import { useToastStore } from '../../stores/toastStore';
@@ -10,6 +11,7 @@ export function DocumentList({ userId }) {
   const executeDocumentPurge = useDocumentStore((s) => s.executeDocumentPurge);
   const setInputEnabled = useUiStore((s) => s.setInputEnabled);
   const setRuntimeStatus = useUiStore((s) => s.setRuntimeStatus);
+  const togglePdf = usePdfStore((s) => s.toggle);
 
   const [deleteDocId, setDeleteDocId] = useState(null);
   const addToast = useToastStore((s) => s.addToast);
@@ -55,6 +57,7 @@ export function DocumentList({ userId }) {
             e?.stopPropagation?.();
             setDeleteDocId(doc.document_id);
           }}
+          onClick={() => togglePdf(doc.filename, 1)}
         />
       ))}
     </>

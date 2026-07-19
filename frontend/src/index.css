@@ -375,6 +375,7 @@ body {
   border-radius: var(--radius-sm);
   gap: 6px;
   transition: background 0.15s ease;
+  cursor: pointer;
 }
 
 .doc-item:hover {
