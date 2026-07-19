@@ -8,6 +8,7 @@ from backend.database import get_db
 from backend.services.agents.orchestrator import create_orchestrator_agent
 from backend.services.agents.rag_worker import run_rag_sub_agent
 from backend.config import PromptContainer, worker_prompt_var, status_emitter_var, ROUTER_MODEL
+from backend.services.status_messages import pick_status
 
 router = APIRouter()
 
@@ -20,6 +21,8 @@ TOOL_STATUS_MESSAGES = {
 async def websocket_chat(websocket: WebSocket):
     await websocket.accept()
     pool = get_db()
+    
+    last_status_message = None
     
     send_lock = asyncio.Lock()
     async def safe_send(data: str):
@@ -167,7 +170,10 @@ async def websocket_chat(websocket: WebSocket):
             status_steps = []
             thinking_duration_ms = None
 
-            async def send_status(status_text: str):
+            async def send_status_stage(stage: str, **kwargs):
+                nonlocal last_status_message
+                status_text = pick_status(stage, last_message=last_status_message, **kwargs)
+                last_status_message = status_text
                 status_steps.append(status_text)
                 await safe_send(json.dumps({
                     "type": "status",
@@ -175,8 +181,8 @@ async def websocket_chat(websocket: WebSocket):
                     "session_id": session_id,
                 }))
 
-            status_emitter_var.set(send_status)
-            await send_status("Understanding your question")
+            status_emitter_var.set(send_status_stage)
+            await send_status_stage("routing_start")
             full_response = ""
             citation_chunks = {}
             active_tool = None
@@ -190,17 +196,27 @@ async def websocket_chat(websocket: WebSocket):
                     active_tool = event.get("name")
                     tool_called = True
 
-                    status_msg = TOOL_STATUS_MESSAGES.get(
-                        active_tool,
-                        "Working on it"
-                    )
-
-                    await send_status(status_msg)
+                    if active_tool == "rag_sub_agent":
+                        await send_status_stage("rag_tool_start")
+                    elif active_tool == "catalog_sub_agent":
+                        await send_status_stage("catalog_tool_start")
+                    else:
+                        status_msg = TOOL_STATUS_MESSAGES.get(
+                            active_tool,
+                            "Working on it"
+                        )
+                        last_status_message = status_msg
+                        status_steps.append(status_msg)
+                        await safe_send(json.dumps({
+                            "type": "status",
+                            "data": status_msg,
+                            "session_id": session_id,
+                        }))
                 elif event_name == "on_tool_end":
                     ended_tool_name = event.get("name")
                     active_tool = None
 
-                    await send_status("Putting together a response")
+                    await send_status_stage("synthesis")
                     await asyncio.sleep(0.7)
                     output = event.get("data", {}).get("output")
                     # Tool output may be a ToolMessage object or a plain string
@@ -239,7 +255,7 @@ async def websocket_chat(websocket: WebSocket):
             if not tool_called:
                 print("WARNING: Supervisor did not call any tool. Falling back to rag_sub_agent.")
 
-                await send_status("Searching your documents")
+                await send_status_stage("rag_tool_start")
 
                 full_response = await run_rag_sub_agent(
                     query=message,

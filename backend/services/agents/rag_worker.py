@@ -7,10 +7,10 @@ from backend.prompts import get_rag_agent_prompt, get_query_decomposition_prompt
 from backend.config import worker_prompt_var, status_emitter_var
 from rank_bm25 import BM25Okapi
 
-async def _emit(text: str):
+async def _emit_stage(stage: str, **kwargs):
     cb = status_emitter_var.get(None)
     if cb:
-        await cb(text)
+        await cb(stage, **kwargs)
 
 
 # ── history-aware query rewrite ─────────────────────────────────────────
@@ -262,10 +262,13 @@ async def _retrieve_and_rerank(client, target_collection, filter_expr, query, bm
     """Decompose (if needed) -> hybrid retrieve per sub-question -> dedupe -> rerank.
     Returns (sub_questions, top_chunks). top_chunks == [] means nothing was found."""
     if _needs_decomposition(query):
-        await _emit("Breaking this into smaller questions")
+        await _emit_stage("query_decomposition")
         sub_questions = await decompose_query(query)
         if len(sub_questions) > 1:
-            await _emit(f"Looking at {len(sub_questions)} parts of your question")
+            # Emit sequentially for each sub-question
+            for idx, sq in enumerate(sub_questions):
+                await _emit_stage("multi_part_progress", n=idx + 1, total=len(sub_questions))
+                await _emit_stage("sub_question_search", query=sq)
     else:
         sub_questions = [query]
 
@@ -379,8 +382,7 @@ async def run_rag_sub_agent(
     bm25_index, bm25_corpus = await _build_bm25_index(client, target_collection, filter_expr, cache_key)
 
     # ── 1st pass: Retrieve -> Rerank -> LLM Answer ──
-    clean_query = query.replace('"', '').strip()[:60]
-    await _emit(f'Searching your documents for "{clean_query}"')
+    await _emit_stage("sub_question_search", query=query)
 
     sub_questions, top_chunks = await _retrieve_and_rerank(
         client, target_collection, filter_expr, query, bm25_index, bm25_corpus
@@ -396,7 +398,7 @@ async def run_rag_sub_agent(
         return json.dumps({"answer": answer_text, "citations": flat_citations})
 
     # ── Retry path: Rewrite Query -> Retrieve Again -> Rerank Again -> LLM Again ──
-    await _emit("Refining the search — trying a different phrasing")
+    await _emit_stage("query_rewrite")
     if history and _needs_rewrite(query):
         retry_query = await _rewrite_from_history(query, history)
     else:
@@ -408,8 +410,7 @@ async def run_rag_sub_agent(
 
     print(f"[RETRY] LLM reported no result -> retrying with rewritten query: {retry_query!r}")
 
-    clean_retry_query = retry_query.replace('"', '').strip()[:60]
-    await _emit(f'Searching again for "{clean_retry_query}"')
+    await _emit_stage("sub_question_search", query=retry_query)
 
     retry_sub_questions, retry_top_chunks = await _retrieve_and_rerank(
         client, target_collection, filter_expr, retry_query, bm25_index, bm25_corpus
