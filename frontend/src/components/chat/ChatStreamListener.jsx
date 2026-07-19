@@ -8,6 +8,7 @@ export function ChatStreamListener() {
   const finalizeErrorMessage = useSessionStore((s) => s.finalizeErrorMessage);
   const endStream = useSessionStore((s) => s.endStream);
   const appendStreamingStep = useSessionStore((s) => s.appendStreamingStep);
+  const renameSessionFromServer = useSessionStore((s) => s.renameSessionFromServer);
 
   useEffect(() => {
     const setCitationChunks = useSessionStore.getState().setCitationChunks;
@@ -19,11 +20,11 @@ export function ChatStreamListener() {
         if (payload.sessionId === streamingSessionId) {
           appendStreamingStep(payload.data);
         }
-      }
-      else if (event === 'citation_chunks') {
+      } else if (event === 'citation_chunks') {
         setCitationChunks(payload.data);
-       }
-      else if (event === 'end') {
+      } else if (event === 'session_renamed') {
+        renameSessionFromServer(payload.sessionId, payload.sessionName);
+      } else if (event === 'end') {
         const { streamingSessionId, streamingText } = useSessionStore.getState();
         if (payload.sessionId === streamingSessionId) {
           finalizeAiMessage(payload.sessionId, streamingText, payload.latencyMs);
@@ -39,7 +40,7 @@ export function ChatStreamListener() {
       }
     });
     return unsubscribe;
-  }, [appendStreamToken, finalizeAiMessage, finalizeErrorMessage, endStream, appendStreamingStep]);
+  }, [appendStreamToken, finalizeAiMessage, finalizeErrorMessage, endStream, appendStreamingStep, renameSessionFromServer]);
 
   return null;
 }

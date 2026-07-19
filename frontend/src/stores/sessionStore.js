@@ -315,4 +315,16 @@ export const useSessionStore = create((set, get) => ({
       throw err;
     }
   },
+
+  renameSessionFromServer: (sessionId, sessionName) => {
+    set((state) => ({
+      sessionMetadata: {
+        ...state.sessionMetadata,
+        [sessionId]: {
+          ...state.sessionMetadata[sessionId],
+          session_name: sessionName,
+        }
+      }
+    }));
+  },
 }));

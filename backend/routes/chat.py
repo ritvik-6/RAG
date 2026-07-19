@@ -7,7 +7,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from backend.database import get_db
 from backend.services.agents.orchestrator import create_orchestrator_agent
 from backend.services.agents.rag_worker import run_rag_sub_agent
-from backend.config import PromptContainer, worker_prompt_var, status_emitter_var
+from backend.config import PromptContainer, worker_prompt_var, status_emitter_var, ROUTER_MODEL
 
 router = APIRouter()
 
@@ -21,8 +21,13 @@ async def websocket_chat(websocket: WebSocket):
     await websocket.accept()
     pool = get_db()
     
+    send_lock = asyncio.Lock()
+    async def safe_send(data: str):
+        async with send_lock:
+            await websocket.send_text(data)
+    
     if not pool:
-        await websocket.send_text(json.dumps({"type": "error", "data": "Cluster singletons offline."}))
+        await safe_send(json.dumps({"type": "error", "data": "Cluster singletons offline."}))
         await websocket.close()
         return
 
@@ -47,6 +52,7 @@ async def websocket_chat(websocket: WebSocket):
             collection_name = f"user_{user_id.replace('-', '_')}"
             
             # Record historical chains to PostgreSQL and retrieve/create session
+            is_new_session = False
             async with pool.acquire() as conn:
                 # Fetch the thread_id
                 row = await conn.fetchrow(
@@ -56,6 +62,7 @@ async def websocket_chat(websocket: WebSocket):
                 thread_id = row["thread_id"] if row else None
                 
                 if not thread_id:
+                    is_new_session = True
                     # Determine the next sequential default session name
                     existing_rows = await conn.fetch(
                         "SELECT session_name FROM chat_sessions WHERE user_id = $1",
@@ -109,6 +116,40 @@ async def websocket_chat(websocket: WebSocket):
                     session_id, "user", message
                 )
 
+            if is_new_session:
+                async def generate_and_update_title(sid, msg_text):
+                    try:
+                        prompt_messages = [
+                            {"role": "system", "content": "Generate a concise 3-6 word title summarizing this user's question. No punctuation at the end, no quotes, no markdown. Output ONLY the title."},
+                            {"role": "user", "content": msg_text}
+                        ]
+                        res = await ROUTER_MODEL.ainvoke(prompt_messages)
+                        generated_title = res.content.strip()
+                        
+                        generated_title = generated_title.strip("\"'")
+                        
+                        if len(generated_title) > 60:
+                            generated_title = generated_title[:57].strip() + "..."
+                        
+                        if not generated_title:
+                            return
+                        
+                        async with pool.acquire() as db_conn:
+                            await db_conn.execute(
+                                "UPDATE chat_sessions SET session_name = $1 WHERE session_id = $2",
+                                generated_title, sid
+                            )
+                        
+                        await safe_send(json.dumps({
+                            "type": "session_renamed",
+                            "session_id": sid,
+                            "session_name": generated_title
+                        }))
+                    except Exception as e:
+                        print(f"[BACKGROUND TITLE GENERATION] Failed to generate/update session title: {e}")
+
+                asyncio.create_task(generate_and_update_title(session_id, message))
+
             formatted_history = [
                 {"role": "user" if r["sender"] == "user" else "assistant", "content": r["message_text"]}
                 for r in rows
@@ -117,7 +158,7 @@ async def websocket_chat(websocket: WebSocket):
             # Instantiating modern hierarchical supervisor agent
             agent = create_orchestrator_agent(user_id, collection_name, history=formatted_history)
             
-            await websocket.send_text(json.dumps({
+            await safe_send(json.dumps({
                 "type": "start",
                 "thread_id": str(thread_id),
                 "session_id": session_id
@@ -128,7 +169,7 @@ async def websocket_chat(websocket: WebSocket):
 
             async def send_status(status_text: str):
                 status_steps.append(status_text)
-                await websocket.send_text(json.dumps({
+                await safe_send(json.dumps({
                     "type": "status",
                     "data": status_text,
                     "session_id": session_id,
@@ -180,7 +221,7 @@ async def websocket_chat(websocket: WebSocket):
                         full_response = answer_text
 
                         if citation_chunks:
-                            await websocket.send_text(json.dumps({
+                            await safe_send(json.dumps({
                                 "type": "citation_chunks",
                                 "data": citation_chunks,
                                 "session_id": session_id,
@@ -192,7 +233,7 @@ async def websocket_chat(websocket: WebSocket):
                             piece = word if i == 0 else " " + word
                             if thinking_duration_ms is None:
                                 thinking_duration_ms = round((time.perf_counter() - start_time) * 1000)
-                            await websocket.send_text(json.dumps({"type": "token", "data": piece,"session_id": session_id}))
+                            await safe_send(json.dumps({"type": "token", "data": piece,"session_id": session_id}))
                             await asyncio.sleep(0.02)
 
             if not tool_called:
@@ -216,7 +257,7 @@ async def websocket_chat(websocket: WebSocket):
                     pass
 
                 if citation_chunks:
-                    await websocket.send_text(json.dumps({
+                    await safe_send(json.dumps({
                         "type": "citation_chunks",
                         "data": citation_chunks,
                         "session_id": session_id,
@@ -228,7 +269,7 @@ async def websocket_chat(websocket: WebSocket):
                     piece = word if i == 0 else " " + word
                     if thinking_duration_ms is None:
                         thinking_duration_ms = round((time.perf_counter() - start_time) * 1000)
-                    await websocket.send_text(
+                    await safe_send(
                         json.dumps({
                             "type": "token",
                             "data": piece,
@@ -241,7 +282,7 @@ async def websocket_chat(websocket: WebSocket):
             end_time = time.perf_counter()
             latency_ms = round((end_time - start_time) * 1000)
             
-            await websocket.send_text(json.dumps({
+            await safe_send(json.dumps({
                 "type": "end",
                 "latency_ms": latency_ms,
                 "session_id": session_id

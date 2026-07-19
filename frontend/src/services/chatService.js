@@ -30,8 +30,10 @@ class ChatService {
       this._notify('error', { sessionId: msg.session_id, data: msg.data });
     } else if (msg.type === "status") {
       this._notify("status", {sessionId: msg.session_id,data: msg.data,});
-    }else if (msg.type === 'citation_chunks') {
+    } else if (msg.type === 'citation_chunks') {
       this._notify('citation_chunks', { sessionId: msg.session_id, data: msg.data });
+    } else if (msg.type === 'session_renamed') {
+      this._notify('session_renamed', { sessionId: msg.session_id, sessionName: msg.session_name });
     }
   }
 

@@ -29,11 +29,11 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # Generation model — used for actual answer synthesis (RAG answers, catalog tables).
 # Slight temperature is fine here; wording variation doesn't change correctness.
-MODEL = ChatGroq(model="qwen/qwen3-32b", reasoning_format="parsed", temperature=0.3)
+MODEL = ChatGroq(model="openai/gpt-oss-120b", reasoning_format="parsed", temperature=0.3)
 
 # Router model — used ONLY for tool-selection / classification decisions.
 # Temperature=0 so the same question always routes to the same tool.
-ROUTER_MODEL = ChatGroq(model="qwen/qwen3-32b", reasoning_format="parsed", temperature=0)
+ROUTER_MODEL = ChatGroq(model="openai/gpt-oss-120b", reasoning_format="parsed", temperature=0)
 
 EMBEDDINGS = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 USE_SHARED_COLLECTION = os.getenv("USE_SHARED_COLLECTION", "true").lower() == "true"
